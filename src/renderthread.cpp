@@ -19,7 +19,7 @@ void RenderThread::run()
         }
     }
     std::cout << "(" << m_x / m_range << ", " << m_y / m_range << ")" << std::endl;
-    StatusLogger::updateStatus(m_x, m_y); // Tell the path tracer that our square is done for logging
+    StatusLogger::getInstance()->updateStatus(m_x, m_y); // Tell the path tracer that our square is done for logging
 }
 
 void RenderThread::setData(PathTracer *p, Vector3f *intensityValues, const Scene &scene, int x, int y,
