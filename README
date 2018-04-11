@@ -1,0 +1,73 @@
+README for PathTracer
+
+----------------------------------------------------------------------
+Usage
+----------------------------------------------------------------------
+All scripts found in "scripts" folder:
+- run.sh [scenefile identifier]
+	Runs the pathtracer on the scenefile "[X]" found in "Path-Tracer/example-scenes/[X].xml" and creates the image "[X].png" in the "output_images" folder.
+- build.sh
+	Builds the program
+- all.sh [scenefile identifier]
+	Builds and runs the program
+- clean.sh
+	Removes all output images and logs
+- BROKEN: parallel_run.sh [scenefile identifier] [section_id] [section]
+	Explained in detail below
+- BROKEN: run_distributed [scenefile identifier]
+	Explained in detail below
+
+You can also run it from QT Creator, passing in 
+	[1] scene filename, 
+	[2] an output filename,
+	[3] OPTIONAL the section id (default to 0) 
+	[4] OPTIONAL the number of sections (default to 1). 
+The last two parameters are explained below.
+
+----------------------------------------------------------------------
+Parallelized Code
+----------------------------------------------------------------------
+
+See files: renderthread.h/cpp pathtracer.h/cpp
+
+The program is parallelized via QThreads and the QThreadPool class. I chunk off the image into blocks of size PARALLEL_RANGE x PARALLEL_RANGE (defined in pathtracer.h). For each block, a new thread is added to the ThreadPool which renders that block of pixels. 
+
+Note that I also have a montiter class called "StatusLogger" which keeps track of which blocks have finished. When any block finishes, it tells the StatusLogger, which is threadsafe via a Mutex. Upon recieving an update, StatusLogger prints the state of the rendering. An example output is as follows, where each space represents a parallel block of pixels:
+
+|X|X|X|X|X|X|X|X|X|X|
+|X|X|X|X|X|X|X|X|X|X|
+|X| |X|X| | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | | 
+
+Note that status logging can be turned off via the boolean "SHOULD_PRINT_STATUS" in StatusLogger.h
+
+----------------------------------------------------------------------
+Build System: CURRENTLY NON-FUNCTIONAL
+----------------------------------------------------------------------
+
+Usage:
+------
+First, run "kinit" to allow ssh into different computers on the Brown CS network.
+Then, by running "./run_distributed cornell" from the path directory, the build system ssh's into 10 different machines in CIT 201 (each of which have 8 CPU cores) and assigns them to render 1/10 of the requested image. This is done in the background using "nohup" and each image is output to a different file in the output folder (scenecornell_0.png, scenecornell_1.png, etc..). The status of these renderings can be viewed through "./_log.sh" from the path folder or by checking each log individually in the "logs" folder. 
+
+When all sections have successfully finished, cd into the output folder and run "python concat_images.py cornell 10" to read in the 10 separate files and stich them together into a single output file named "scenecornell_full.png".
+
+Aside on extensibility:
+------
+Note the word "cornell" as a parameter to these scripts can be replaced with any scene file [X] where the scene file is named exactly: "scene[X].xml". In order to use more (or fewer) computers, edit "hosts.txt" to add new hostnames (must be valid ssh in the brown cs department) and change the second parameter of "concat_images" to match the number of hosts. 
+
+Pathtracing:
+------
+To allow this build system to properly work, I modified my pathtracer so that it takes in two optional additional arguments:
+ - section_id: The section of the image to render
+ - sections: The number of sections in the image
+Note: To render the full image, supply 0 and 1 respectively to these parameters.
+
+The different sections are split vertically, so it is vital that the height of the image is evenly divided by the number of sections (which is why I prefered 10 cpus). One side-effect of this system is that the pixel you are calculating is *NOT* the pixel you are outputing the value, so I often keep separate values "pixel_index" and "output_index" in my code (especially in tracescene and tracepixel).
+
