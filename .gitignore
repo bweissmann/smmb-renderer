@@ -1,2 +1,2 @@
-build-release/
-output_images/
+build-release/*
+output_images/*
