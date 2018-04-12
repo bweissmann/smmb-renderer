@@ -80,3 +80,4 @@ Vector3f BSDF::refractionBsdf(Ray incoming_ray, Vector3f out, Vector3f normal, c
     return full_refraction / out.dot(N);
 }
 
+

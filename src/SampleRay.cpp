@@ -19,8 +19,11 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
 
     switch (type) {
     case IDEAL_DIFFUSE:
+        return sampleIdealDiffuseImportance(position, incoming_ray, surface_normal);
+//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
     case GLOSSY_SPECULAR:
-        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
+//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
+        return sampleGlossySpecularImportance(position, incoming_ray, surface_normal, mat);
     case IDEAL_SPECULAR:
         return idealSpecularReflection(position, incoming_ray, surface_normal);
     case REFRACTION:
@@ -33,6 +36,11 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
 
 SampledRayInfo SampleRay::uniformSampleHemisphere(const Vector3f &position, const Ray &incoming_ray,
                                                   const Vector3f &surface_normal) {
+
+    if (incoming_ray.d.dot(surface_normal) > 0.f) {
+//        std::cout << "HIT" << std::endl;
+    }
+
     float phi = acos(MathUtils::random());
     float theta = 2.f * M_PI * MathUtils::random();
 
@@ -43,6 +51,60 @@ SampledRayInfo SampleRay::uniformSampleHemisphere(const Vector3f &position, cons
 
     return SampledRayInfo(ray, 1 / (2.f * M_PI));
 }
+
+
+SampledRayInfo SampleRay::sampleIdealDiffuseImportance(const Vector3f &position, const Ray &incoming_ray,
+                                                      const Vector3f &surface_normal) {
+    float phi = acos(sqrt(MathUtils::random()));
+    float theta = 2.f * M_PI * MathUtils::random();
+
+    const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+    const Vector3f worldspace_direction = tangentToWorldSpace(surface_normal, tangentspace_direction);
+
+    Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    float cos_phi = worldspace_direction.dot(surface_normal);
+    return SampledRayInfo(ray, cos_phi / M_PI);
+}
+
+SampledRayInfo SampleRay::sampleGlossySpecularImportance(const Vector3f &position, const Ray &incoming_ray,
+                                                      const Vector3f &surface_normal, const tinyobj::material_t& mat) {
+    Vector3f reflected_direction = MathUtils::reflect(incoming_ray.d, surface_normal);
+    Vector3f worldspace_direction;
+    float phi, n;
+    int count = 0;
+    if (count > 20) {
+        std::cout << "Too many iterations " << surface_normal.dot(reflected_direction) << " ))) "  << surface_normal.dot(incoming_ray.d) << " ? " << reflected_direction << " : " << surface_normal << std::endl;
+        exit(1);
+    }
+    n = mat.shininess;
+    phi = acos(pow(MathUtils::random(), 1.f /(n + 1.f)));
+    float theta = 2.f * M_PI * MathUtils::random();
+
+    const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+    worldspace_direction = tangentToWorldSpace(reflected_direction, tangentspace_direction);
+    count ++;
+    if (worldspace_direction.dot(surface_normal) < 0.f) {
+//        Vector3f not_the_normal = (surface_normal.x() > 0.1 || surface_normal.x() < -0.1)
+//                ? Vector3f(0, 1.f, 0) : Vector3f(1.f, 0, 0);
+//        const Vector3f surface_tangent = surface_normal.cross(not_the_normal);
+//        Vector3f surface_bitangent = surface_normal.cross(surface_tangent);
+//        if (surface_bitangent.dot(worldspace_direction) < 0) {
+//            surface_bitangent = -1.f * surface_bitangent;
+
+//        }
+//        worldspace_direction = MathUtils::reflect(-1.f * worldspace_direction, surface_bitangent);
+//        worldspace_direction = MathUtils::reflect(-1.f * worldspace_direction, surface_normal);
+
+        worldspace_direction = MathUtils::reflect(-1.f * worldspace_direction, surface_normal);
+    }
+
+    Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    float cos_phi = reflected_direction.dot(worldspace_direction);
+    return SampledRayInfo(ray, (n + 1.f) * pow(cos_phi, n) / (2.f * M_PI));
+
+//    return SampledRayInfo(ray, (n + 1.f) * pow(cos(phi), n) / (2.f * M_PI));
+}
+
 
 SampledRayInfo SampleRay::idealSpecularReflection(const Vector3f &position, const Ray &incoming_ray, const Vector3f &surface_normal) {
     Vector3f reflected_direction = MathUtils::reflect(incoming_ray.d, surface_normal);

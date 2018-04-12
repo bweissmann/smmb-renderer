@@ -24,6 +24,12 @@ public:
     static SampledRayInfo uniformSampleHemisphere(const Eigen::Vector3f &position, const Ray &incoming_ray,
                                                   const Eigen::Vector3f &surface_normal);
 
+    static SampledRayInfo sampleIdealDiffuseImportance(const Eigen::Vector3f &position, const Ray &incoming_ray,
+                                                  const Eigen::Vector3f &surface_normal);
+
+    static SampledRayInfo sampleGlossySpecularImportance(const Eigen::Vector3f &position, const Ray &incoming_ray,
+                                                  const Eigen::Vector3f &surface_normal, const tinyobj::material_t& mat);
+
     static SampledRayInfo idealSpecularReflection(const Eigen::Vector3f &position, const Ray &incoming_ray, const Eigen::Vector3f &surface_normal);
 
     static SampledRayInfo refraction(const Eigen::Vector3f &position, const Ray &incoming_ray,

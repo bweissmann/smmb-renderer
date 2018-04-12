@@ -77,6 +77,7 @@ void PathTracer::tracePixel(int output_x, int output_y, const Scene& scene,
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
 }
 
+//pass in &path
 Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
 {
     IntersectionInfo i;
