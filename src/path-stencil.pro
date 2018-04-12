@@ -358,4 +358,5 @@ HEADERS += \
     SampleRay.h \
     renderthread.h \
     bsdf.h \
-    util/statuslogger.h
+    util/statuslogger.h \
+    util/pathnode.h
