@@ -207,9 +207,23 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
 //FUNCTIONS FOR COMPUTING CONTRIBUTION FOR BIDIRECTIONAL
 Vector3f PathTracer::combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
+    int num_eye_nodes; = eye_path.size();
+    int num_light_nodes = light_path.size();
+    Vector3f weighted_contribution(0, 0, 0);
+    for (int i = 0; i < num_eye_nodes; i++) {
+        int max_eye_index = i;
+        if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
+            continue;
+        }
+        for (int j = 0; j < num_light_nodes; j++) {
 
-//    TODO::
-    //combine paths, compute weights and contribs, add to vector of radiance
+            //do I need to check if connection point is also a specular surface?
+            Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
+            float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
+            weighted_contribution += weight * contrib;
+        }
+    }
+    return weighted_contribution;
 }
 
 Vector3f PathTracer::computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
@@ -255,7 +269,6 @@ Vector3f PathTracer::computePathTracingContrib(const std::vector<PathNode> &eye_
     contrib = contrib.cwiseProduct(light.emission) * throughput / light.point_prob;
     return contrib;
 }
-
 
 //light tracing case ? do we need to consider it ?
 Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &light_path,  const PathNode &eye, int max_light_index) {
@@ -313,6 +326,8 @@ Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &ey
  */
 Vector3f PathTracer::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index) {
     Vector3f contrib(1, 1, 1);
+
+    //TODO:: do I need to deal with probability of picking certain direction.
     for (int i = 1; i < max_eye_index; i++) {
         PathNode node =  eye_path[i];
         contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.directional_prob;
@@ -353,6 +368,8 @@ float PathTracer::getDifferentialThroughput(const PathNode &node1, const PathNod
     Vector3f direction = node2.position - node1.position;
     float squared_dist = direction.squaredNorm();
     direction.normalize();
+
+    //check this for throughput
     float cos_node1 = node1.surface_normal.dot(direction);
     float cos_node2 = node2.surface_normal.dot(-1.f * direction);
     return cos_node1 * cos_node2 / squared_dist;
