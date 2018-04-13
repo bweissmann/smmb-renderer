@@ -39,6 +39,9 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
 
+
+    //BDPT specific functions
+
     Eigen::Vector3f combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
 
 
@@ -52,6 +55,11 @@ private:
     Eigen::Vector3f computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index);
     Eigen::Vector3f computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index);
     float getDifferentialThroughput(const PathNode &node1, const PathNode &node2);
+
+    float computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
+                                        int max_eye_index, int max_light_index);
+    float computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
+                                 int max_eye_index, int max_light_index);
 
 };
 

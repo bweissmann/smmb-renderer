@@ -206,7 +206,11 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
 
 //FUNCTIONS FOR COMPUTING CONTRIBUTION FOR BIDIRECTIONAL
+Vector3f PathTracer::combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
 
+//    TODO::
+    //combine paths, compute weights and contribs, add to vector of radiance
+}
 
 Vector3f PathTracer::computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                              int max_eye_index, int max_light_index) {
@@ -258,7 +262,6 @@ Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &lig
     return Vector3f(0, 0, 0);
 }
 
-
 /**
  * Computes the path radiance by connecting the two subpaths at the indicated
  * indices.
@@ -298,7 +301,6 @@ Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &ey
     total_contrib *= throughput;
     return total_contrib;
 }
-
 
 /**
  * Computes the contribution from the eye path up to the max
@@ -354,4 +356,74 @@ float PathTracer::getDifferentialThroughput(const PathNode &node1, const PathNod
     float cos_node1 = node1.surface_normal.dot(direction);
     float cos_node2 = node2.surface_normal.dot(-1.f * direction);
     return cos_node1 * cos_node2 / squared_dist;
+}
+
+
+//TODO:: figure out edge cases / check
+float PathTracer::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
+                                    int max_eye_index, int max_light_index) {
+    float combined_prob = 1.f;
+    float prob_sum = 0.f;
+
+    const PathNode *node = &eye_path[max_eye_index];
+    const PathNode *previous = &eye_path[max_eye_index - 1];
+
+    for (int i = max_light_index; i > 0; i++) {
+        Vector3f from_old_node = (node->position - previous->position).normalized();
+        Vector3f to_new_node = (light_path[i].position - node->position).normalized();
+
+        float prob = BSDF::getBsdfDirectionalProb(from_old_node, to_new_node, node->surface_normal, node->mat, node->type, 1.f);
+        float prob_to_light_node = light_path[i - 1].directional_prob;
+
+        combined_prob *= powf(prob/prob_to_light_node, 2);
+        prob_sum += combined_prob;
+        previous = node;
+        node = &light_path[i];
+    }
+
+    combined_prob = 1.f;
+    node = &light_path[max_light_index];
+    previous = &light_path[max_eye_index - 1];
+    for (int i = max_eye_index; i > 0; i++) {
+        Vector3f from_old_node = (node->position - previous->position).normalized();
+        Vector3f to_new_node = (eye_path[i].position - node->position).normalized();
+        float prob = BSDF::getBsdfDirectionalProb(from_old_node, to_new_node, node->surface_normal, node->mat, node->type, 1.f);
+        float prob_to_eye_node = eye_path[i - 1].directional_prob;
+        combined_prob *= powf(prob_to_eye_node / prob, 2);
+        prob_sum += combined_prob;
+        previous = node;
+        node = &light_path[i];
+    }
+
+    //TODO::what to do for paths where light = 0 or eye = 0 (as max)
+    return 1.f / prob_sum;
+}
+
+//might be able to delete this
+float PathTracer::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
+                             int max_eye_index, int max_light_index) {
+
+    float eye_prob = 1.f; //probability of picking eye point is 1
+
+    //probability at point i is probability of outgoing directon at i - 1 * cosine / distance squared
+    for (int i = 1; i <= max_eye_index; i++) {
+        Vector3f connecting_ray = eye_path[i - 1].position - eye_path[i].position;
+        float squared_dist = connecting_ray.squaredNorm();
+        connecting_ray.normalized();
+        float cosine_r = eye_path[i].surface_normal.dot(connecting_ray);
+        eye_prob *= eye_path[i - 1].directional_prob * cosine_r / squared_dist;
+    }
+
+    float light_prob = light_path[0].point_prob; //probability of selecting that point
+    for (int i = 1; i <= max_light_index; i++) {
+        Vector3f connecting_ray = light_path[i - 1].position - light_path[i].position;
+        float squared_dist = connecting_ray.squaredNorm();
+        connecting_ray.normalized();
+        float cosine_r = light_path[i].surface_normal.dot(connecting_ray);
+        light_prob *= light_path[i - 1].directional_prob * cosine_r / squared_dist;
+    }
+
+    //TODO:: what about connecting probabilities?
+
+    return eye_prob * light_prob;
 }
