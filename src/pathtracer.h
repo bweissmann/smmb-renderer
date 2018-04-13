@@ -49,6 +49,10 @@ private:
     Eigen::Vector3f computeLightTracingContrib(const std::vector<PathNode> &light_path,  const PathNode &eye, int max_light_index);
     Eigen::Vector3f computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
 
+    Eigen::Vector3f computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index);
+    Eigen::Vector3f computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index);
+    float getDifferentialThroughput(const PathNode &node1, const PathNode &node2);
+
 };
 
 #endif // PATHTRACER_H
