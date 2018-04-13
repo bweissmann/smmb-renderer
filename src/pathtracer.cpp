@@ -202,3 +202,99 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
 }
+
+
+
+//FUNCTIONS FOR COMPUTING CONTRIBUTION FOR BIDIRECTIONAL
+
+
+Vector3f PathTracer::computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
+                                             int max_eye_index, int max_light_index) {
+    //eye points light points
+    //case 1 (0, 0)
+    if (max_eye_index == 0 && max_light_index == 0) {
+//        return computeZeroBouncePathContrib(eye, light);
+    } else if (max_eye_index > 0 && max_light_index == 0) {
+
+    }
+
+    //case 2(s > 0, 0)
+    //classical light tracing with direct lighting
+}
+
+Vector3f PathTracer::computeZeroBouncePathContrib(const PathNode &eye, const PathNode &light) {
+
+    //TODO:: question about G(x <-> x') when x is eye -> must give normal for to eye?
+
+    //TODO:: add probability calculation?
+    Vector3f direction = (eye.position - light.position);
+    float squared_dist = direction.squaredNorm();
+    direction.normalize();
+    return light.emission * eye.surface_normal.dot(-1.f * direction)
+            * light.surface_normal.dot(direction) / squared_dist;
+}
+
+//path tracing case
+Vector3f PathTracer::computePathTracingContrib(const std::vector<PathNode> &eye_path,  const PathNode &light, int max_eye_index) {
+    Vector3f contrib(1, 1, 1); //set to zero initially
+    for (int i = 1; i < max_eye_index; i++) {
+        PathNode node =  eye_path[i];
+        contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.prob;
+    }
+    PathNode max_eye_node = eye_path[max_eye_index];
+    PathNode previous_eye_node = eye_path[max_eye_index - 1];
+    Vector3f direction = (light.position - max_eye_node.position);
+    float squared_dist = direction.squaredNorm();
+    direction.normalize();
+    Vector3f brdf = BSDF::getBsdfFromType(previous_eye_node.outgoing_ray, direction, max_eye_node.surface_normal,
+                          max_eye_node.mat, max_eye_node.type);
+
+    float throughput = -1.f * direction.dot(light.surface_normal)
+            * direction.dot(max_eye_node.surface_normal) / squared_dist;
+    contrib = contrib.cwiseProduct(brdf) * throughput;
+    contrib = contrib.cwiseProduct(light.emission) / light.prob;
+    return contrib;
+}
+
+
+//light tracing case ? do we need to consider it ?
+Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &light_path,  const PathNode &eye, int max_light_index) {
+
+}
+
+//general case
+Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index) {
+    Vector3f light_path_contrib = light_path[0].emission / light_path[0].prob;
+    for (int i = 1; i < max_light_index; i++) {
+        PathNode light_node = light_path[i];
+        float constant = light_node.surface_normal.dot(light_node.outgoing_ray.d) / light_node.prob;
+        light_path_contrib = light_path_contrib.cwiseProduct(light_node.brdf) * constant;
+    }
+
+    Vector3f eye_path_contrib(1, 1, 1);
+    for (int i = 1; i < max_eye_index; i++) {
+        PathNode eye_node = eye_path[i];
+        float constant = eye_node.surface_normal.dot(eye_node.outgoing_ray.d) / eye_node.prob;
+        eye_path_contrib = eye_path_contrib.cwiseProduct(eye_node.brdf) * constant;
+    }
+
+    //compute for connection
+    PathNode light_node = light_path[max_light_index];
+    PathNode eye_node = eye_path[max_eye_index];
+    Vector3f to_eye_node = (eye_node.position - light_node.position);
+    float distSquared = to_eye_node.squaredNorm();
+    to_eye_node.normalize();
+    Ray incoming_ray = light_path[max_light_index - 1].outgoing_ray;
+    Vector3f light_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_eye_node, light_node.surface_normal,
+                                                     light_node.mat, light_node.type);
+    incoming_ray = eye_path[max_eye_index - 1].outgoing_ray;
+    Vector3f to_light_node = -1 * to_eye_node;
+    Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_light_node, eye_node.surface_normal,
+                                                   eye_node.mat, eye_node.type);
+    float throughput = to_eye_node.dot(light_node.surface_normal)
+            * to_light_node.dot(eye_node.surface_normal) / distSquared;
+
+    Vector3f total_contrib = eye_path_contrib.cwiseProduct(light_path_contrib);
+    total_contrib = total_contrib.cwiseProduct(light_node_brdf.cwiseProduct(eye_node_brdf)) * throughput;
+    return total_contrib;
+}

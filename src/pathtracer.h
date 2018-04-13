@@ -5,6 +5,7 @@
 
 #include "scene/scene.h"
 #include "bsdf.h"
+#include "util/pathnode.h"
 
 class PathTracer
 {
@@ -36,6 +37,17 @@ private:
 
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
+
+
+    Eigen::Vector3f combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
+
+
+    Eigen::Vector3f computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
+
+    Eigen::Vector3f computeZeroBouncePathContrib(const PathNode &eye, const PathNode &light);
+    Eigen::Vector3f computePathTracingContrib(const std::vector<PathNode> &eye_path,  const PathNode &light, int max_eye_index);
+    Eigen::Vector3f computeLightTracingContrib(const std::vector<PathNode> &light_path,  const PathNode &eye, int max_light_index);
+    Eigen::Vector3f computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
 
 };
 

@@ -24,6 +24,10 @@ public:
     static Eigen::Vector3f getBsdfFromType(Ray incoming_ray, Eigen::Vector3f out, Eigen::Vector3f normal,
                                    const tinyobj::material_t& mat, MaterialType type);
 
+    //computes directional probability based given incoming and outgoing
+    static float getBsdfDirectionalProb(const Eigen::Vector3f &incoming, const Eigen::Vector3f &outgoing, Eigen::Vector3f normal,
+                                        const tinyobj::material_t& mat, MaterialType type, float eta);
+
 private:
     static Eigen::Vector3f glossySpecularBsdf(Ray incoming_ray, Eigen::Vector3f out,
                                               Eigen::Vector3f normal, const tinyobj::material_t& mat);
@@ -35,6 +39,14 @@ private:
                                              Eigen::Vector3f normal, const tinyobj::material_t& mat);
 
     static Eigen::Vector3f idealDiffuseBsdf(const tinyobj::material_t& mat);
+
+    static float cosineWeightedProb(const Eigen::Vector3f &outgoing, Eigen::Vector3f normal);
+
+    static float glossyWeightedProb(const Eigen::Vector3f &incoming, const Eigen::Vector3f &outgoing, Eigen::Vector3f normal, const tinyobj::material_t& mat);
+
+    static float idealSpecularProb(const Eigen::Vector3f &incoming, const Eigen::Vector3f &outgoing, Eigen::Vector3f normal);
+    static float idealRefractionProb(const Eigen::Vector3f &incoming, const Eigen::Vector3f &outgoing, Eigen::Vector3f normal, float eta);
+
 
     static constexpr float DIFFUSE_CUTOFF = 0.001f;
     static constexpr float SPECULAR_CUTOFF = 100.0f;
