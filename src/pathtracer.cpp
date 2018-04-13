@@ -248,7 +248,7 @@ Vector3f PathTracer::computePathTracingContrib(const std::vector<PathNode> &eye_
                           max_eye_node.mat, max_eye_node.type);
     float throughput = getDifferentialThroughput(max_eye_node, light);
     contrib = contrib.cwiseProduct(brdf);
-    contrib = contrib.cwiseProduct(light.emission) * throughput / light.prob;
+    contrib = contrib.cwiseProduct(light.emission) * throughput / light.point_prob;
     return contrib;
 }
 
@@ -258,7 +258,18 @@ Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &lig
     return Vector3f(0, 0, 0);
 }
 
-//general case
+
+/**
+ * Computes the path radiance by connecting the two subpaths at the indicated
+ * indices.
+ *
+ * @brief PathTracer::computeBidirectionalContrib
+ * @param eye_path
+ * @param light_path
+ * @param max_eye_index
+ * @param max_light_index
+ * @return
+ */
 Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index) {
 
     //contribution from separate paths
@@ -289,28 +300,53 @@ Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &ey
 }
 
 
+/**
+ * Computes the contribution from the eye path up to the max
+ * index.
+ *
+ * @brief PathTracer::computeEyeContrib
+ * @param eye_path
+ * @param max_eye_index
+ * @return
+ */
 Vector3f PathTracer::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index) {
     Vector3f contrib(1, 1, 1);
     for (int i = 1; i < max_eye_index; i++) {
         PathNode node =  eye_path[i];
-        contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.prob;
+        contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.directional_prob;
     }
     return contrib;
 }
 
+/**
+ * Computes the contribution from the light path up to the max index.
+ *
+ * @brief PathTracer::computeLightContrib
+ * @param light_path
+ * @param max_light_index
+ * @return
+ */
 Vector3f PathTracer::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
-    Vector3f contrib = light_path[0].emission / light_path[0].prob; //going to be direcitonal prob
+    Vector3f contrib = light_path[0].emission / light_path[0].point_prob; //going to be direcitonal prob
     for (int i = 1; i < max_light_index; i++) {
         PathNode light_node = light_path[i];
 
         //TODO:: check that I am multiplying by the right constant in light-tracing
-        float constant = light_node.surface_normal.dot(light_node.outgoing_ray.d) / light_node.prob;
+        float constant = light_node.surface_normal.dot(light_node.outgoing_ray.d) / light_node.directional_prob;
         contrib = contrib.cwiseProduct(light_node.brdf) * constant;
     }
     return contrib;
 }
 
-
+/**
+ * Computes the differential throughput of a ray between
+ * two nodes.
+ *
+ * @brief PathTracer::getDifferentialThroughput
+ * @param node1
+ * @param node2
+ * @return
+ */
 float PathTracer::getDifferentialThroughput(const PathNode &node1, const PathNode &node2) {
     Vector3f direction = node2.position - node1.position;
     float squared_dist = direction.squaredNorm();
