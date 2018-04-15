@@ -11,7 +11,8 @@ enum MaterialType {
     IDEAL_DIFFUSE,
     IDEAL_SPECULAR,
     GLOSSY_SPECULAR,
-    REFRACTION
+    REFRACTION,
+    LIGHT
 };
 
 class BSDF

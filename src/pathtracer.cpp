@@ -219,10 +219,13 @@ Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode
         for (int j = 0; j < num_light_nodes; j++) {
 
             //do I need to check if connection point is also a specular surface?
+
             if (lightIsVisible(eye_path[i].position, light_path[j].position, scene)) {
+
                 Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
                 float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
                 weighted_contribution += weight * contrib;
+
             }
         }
     }
@@ -360,7 +363,8 @@ Vector3f PathTracer::computeLightContrib(const std::vector<PathNode> &light_path
 
 /**
  * Computes the differential throughput of a ray between
- * two nodes. Returns |cos(theta_out) * cos(theta_in)| / distSqaured.
+ * two nodes. Computes and returns the following:
+ * |cos(theta_out) * cos(theta_in)| / dist_sqaured.
  *
  * @brief PathTracer::getDifferentialThroughput
  * @param node1

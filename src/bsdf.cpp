@@ -30,8 +30,10 @@ Vector3f BSDF::getBsdfFromType(Ray incoming_ray, Vector3f out, Vector3f normal,
 MaterialType BSDF::getType(const tinyobj::material_t& mat) {
     Vector3f specular(mat.specular[0], mat.specular[1], mat.specular[2]);
     Vector3f transmittance(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
-
-    if (transmittance.norm() > 0.1) {
+    Vector3f emission(mat.emission[0], mat.emission[1], mat.emission[2]);
+    if (emission.norm() > .1) {
+        return LIGHT;
+    } else if (transmittance.norm() > 0.1) {
         return REFRACTION;
     } else if (specular.norm() < DIFFUSE_CUTOFF) {
         return IDEAL_DIFFUSE;
