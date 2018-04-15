@@ -264,6 +264,8 @@ Vector3f PathTracer::computeZeroBouncePathContrib(const PathNode &eye, const Pat
  * @return
  */
 Vector3f PathTracer::computePathTracingContrib(const std::vector<PathNode> &eye_path,  const PathNode &light, int max_eye_index) {
+
+    //TODO::check if need probability with respect to area
     Vector3f contrib = computeEyeContrib(eye_path, max_eye_index);
     PathNode max_eye_node = eye_path[max_eye_index];
     PathNode previous_eye_node = eye_path[max_eye_index - 1];
@@ -293,6 +295,7 @@ Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &lig
  * @return
  */
 Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index) {
+
 
     //contribution from separate paths
     Vector3f light_path_contrib = computeLightContrib(light_path, max_light_index);
@@ -333,6 +336,7 @@ Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &ey
 Vector3f PathTracer::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index) {
     Vector3f contrib(1, 1, 1);
 
+    //TODO::check if need probability with respect to area
     //TODO:: do I need to deal with probability of picking certain direction.
     for (int i = 1; i < max_eye_index; i++) {
         PathNode node =  eye_path[i];
@@ -350,6 +354,8 @@ Vector3f PathTracer::computeEyeContrib(const std::vector<PathNode> &eye_path, in
  * @return
  */
 Vector3f PathTracer::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
+
+    //TODO::check if need probability with respect to area
     Vector3f contrib = light_path[0].emission / light_path[0].point_prob; //going to be direcitonal prob
     for (int i = 1; i < max_light_index; i++) {
         PathNode light_node = light_path[i];
