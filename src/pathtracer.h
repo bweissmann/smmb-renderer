@@ -13,7 +13,6 @@ public:
     PathTracer(int width, int image_height, int output_height, int section_id);
 
     void traceScene(QRgb *imageData, const Scene &scene);
-    void traceSceneBackwards(QRgb *imageData, const Scene &scene);
 
     void tracePixel(int pixel_x, int pixel_y, const Scene& scene,
                     Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
@@ -39,6 +38,12 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
 
+    void lightTrace(QRgb *imageData, const Scene &scene);
+    void traceLightRay(int *numSamples, Eigen::Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Eigen::Vector3f flux);
+    void traceToCamera(int *numSamples, Eigen::Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Eigen::Vector3f flux);
+
+    const bool LIGHT_TRACING_ONLY = true;
+    float m_hit_paths = 0.f;
 
     //BDPT specific functions
 

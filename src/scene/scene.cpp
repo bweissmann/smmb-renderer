@@ -273,7 +273,7 @@ const std::vector<CS123SceneLightData> &Scene::getLights()
 SampledLightInfo Scene::sampleLight() const {
     int n_objects = _emissive_objects.size();
     int emissive_index = static_cast<int>(floor(MathUtils::random() * n_objects)); // Choose a random object uniformly
-    if (emissive_index == n_objects) emissive_index = n_objects - 1;
+    if (emissive_index == n_objects) emissive_index = n_objects - 1; // bug
     int object_index = _emissive_objects[emissive_index];
 
     // If this object has light, get light from it

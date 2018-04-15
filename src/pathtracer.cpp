@@ -22,6 +22,11 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
+    if (LIGHT_TRACING_ONLY) {
+        lightTrace(imageData, scene);
+        return;
+    }
+
     // Initialize the tread pool
     QThreadPool *threadPool = QThreadPool::globalInstance();
     std::vector<RenderThread *> threads;
@@ -457,3 +462,103 @@ float PathTracer::computePathProbability(const std::vector<PathNode> &eye_path, 
 
     return eye_prob * light_prob;
 }
+
+void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
+
+    // Setup intensity values and logging
+    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
+    int numSamples[m_width * m_output_height];
+
+    for (int i = 0; i < m_width * m_output_height; i++) {
+        intensityValues[i] = Vector3f(0.f, 0.f, 0.f);
+        numSamples[i] = 0;
+    }
+
+    const int num_paths = 1e7;
+    for (int i = 0; i < num_paths; i++) {
+        SampledLightInfo light_info = scene.sampleLight();
+        const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
+        SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
+        traceLightRay(numSamples, intensityValues, ray_info.ray, scene, 0, light_info.prob * ray_info.prob, light_info.emission);
+    }
+
+    for (int i = 0; i < m_width * m_output_height; i++) {
+        std::cout << intensityValues[i].norm() << "/";
+        intensityValues[i] = intensityValues[i] * numSamples[i] / m_hit_paths;
+
+        std::cout << intensityValues[i].norm() << " ";
+    }
+
+    std::cout << m_hit_paths << std::endl;
+
+    toneMap(imageData, intensityValues);
+}
+
+void PathTracer::traceLightRay(int *numSamples, Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Vector3f flux) {
+//    traceToCamera(numSamples, intensityValues, ray, scene, depth, prob, flux);
+
+    IntersectionInfo i;
+
+    if(scene.getBVH().getIntersection(ray, &i, false)) {
+        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
+        const tinyobj::real_t *e = mat.emission; //Emitted color
+        const Vector3f normal = t->getNormal(i); //surface normal
+
+        // Ignore all Emitted Light
+        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
+        if (emitted_light.norm() > 0) {
+            return;
+        }
+
+        MaterialType type = BSDF::getType(mat);
+        float schlick = 1.f;
+
+        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+
+        const Ray next_ray = next_ray_info.ray;
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+
+        const float pdf_rr = 0.5f;//getContinueProbability(brdf);
+        if (MathUtils::random() < pdf_rr && depth < 1) {
+            // Deal with refraction separately
+
+            // All other material types
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            int next_depth = (type == IDEAL_SPECULAR) ? 0 : depth + 1;
+
+            Vector3f next_flux = flux.cwiseProduct(brdf) * N.dot(next_ray.d);
+            traceLightRay(numSamples, intensityValues, next_ray, scene, next_depth, prob * (next_ray_info.prob * pdf_rr * schlick), next_flux);
+        } else {
+            traceToCamera(numSamples, intensityValues, ray, scene, depth + 1, prob * (1.f - pdf_rr), flux);
+        }
+    } else {
+        traceToCamera(numSamples, intensityValues, ray, scene, depth + 1, prob, flux);
+    }
+}
+
+void PathTracer::traceToCamera(int *numSamples, Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Vector3f flux) {
+    IntersectionInfo i;
+
+    if(scene.getBVH().getIntersection(ray, &i, true)) {
+        return;
+    }
+
+    const Vector3f eye_center(0, 0, 0);
+    Matrix4f viewMatrix = scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix();
+    Vector4f origin = ray.o.homogeneous();
+    Vector3f cs_origin = (viewMatrix * origin).head<3>();
+    Vector3f cs_direction_to_camera = eye_center - cs_origin;
+    Vector3f cs_direction_from_camera = -cs_direction_to_camera.normalized() / cs_direction_to_camera.normalized().z();
+    if (abs(cs_direction_from_camera.x()) < 1.f && abs(cs_direction_from_camera.y()) < 1.f) {
+        int x = (cs_direction_from_camera.x() + 1.f) / 2.f * m_width;
+        int y = (1.f - cs_direction_from_camera.y()) / 2.f * m_output_height;
+        Vector3f radience = flux * cs_direction_from_camera.squaredNorm() / pow(Vector3f(0, 0, -1).dot(cs_direction_from_camera), 2);
+        intensityValues[m_width * y + x] += radience / prob;
+        numSamples[m_width * y + x] += 1;
+        m_hit_paths++;
+    }
+}
+
+
