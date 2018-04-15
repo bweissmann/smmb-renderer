@@ -474,7 +474,7 @@ void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
         numSamples[i] = 0;
     }
 
-    const int num_paths = 1e8;
+
     for (int i = 0; i < num_paths; i++) {
         SampledLightInfo light_info = scene.sampleLight();
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
@@ -519,7 +519,7 @@ void PathTracer::traceLightRay(int *numSamples, Vector3f *intensityValues, const
         const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
 
         const float pdf_rr = 0.5f;//getContinueProbability(brdf);
-        if (MathUtils::random() < pdf_rr && depth < 1) {
+        if (MathUtils::random() < pdf_rr) {
             // Deal with refraction separately
 
             // All other material types
