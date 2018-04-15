@@ -474,7 +474,7 @@ void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
         numSamples[i] = 0;
     }
 
-    const int num_paths = 1e7;
+    const int num_paths = 1e8;
     for (int i = 0; i < num_paths; i++) {
         SampledLightInfo light_info = scene.sampleLight();
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
@@ -484,12 +484,10 @@ void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
 
     for (int i = 0; i < m_width * m_output_height; i++) {
         std::cout << intensityValues[i].norm() << "/";
-        intensityValues[i] = intensityValues[i] * numSamples[i] / m_hit_paths;
+        intensityValues[i] = intensityValues[i] * numSamples[i] / num_paths;
 
         std::cout << intensityValues[i].norm() << " ";
     }
-
-    std::cout << m_hit_paths << std::endl;
 
     toneMap(imageData, intensityValues);
 }
@@ -541,9 +539,7 @@ void PathTracer::traceLightRay(int *numSamples, Vector3f *intensityValues, const
 void PathTracer::traceToCamera(int *numSamples, Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Vector3f flux) {
     IntersectionInfo i;
 
-    if(scene.getBVH().getIntersection(ray, &i, true)) {
-        return;
-    }
+
 
     const Vector3f eye_center(0, 0, 0);
     Matrix4f viewMatrix = scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix();
@@ -551,13 +547,19 @@ void PathTracer::traceToCamera(int *numSamples, Vector3f *intensityValues, const
     Vector3f cs_origin = (viewMatrix * origin).head<3>();
     Vector3f cs_direction_to_camera = eye_center - cs_origin;
     Vector3f cs_direction_from_camera = -cs_direction_to_camera.normalized() / cs_direction_to_camera.normalized().z();
+    Vector3f world_to_camera = (viewMatrix.inverse() * Vector4f(cs_direction_to_camera[0], cs_direction_to_camera[1], cs_direction_to_camera[2], 0)).head<3>();
+    const Ray new_ray(ray.o, world_to_camera, AIR_IOR, true);
+
+    if(scene.getBVH().getIntersection(new_ray, &i, true)) {
+        return;
+    }
+
     if (abs(cs_direction_from_camera.x()) < 1.f && abs(cs_direction_from_camera.y()) < 1.f) {
         int x = (cs_direction_from_camera.x() + 1.f) / 2.f * m_width;
         int y = (1.f - cs_direction_from_camera.y()) / 2.f * m_output_height;
         Vector3f radience = flux * cs_direction_from_camera.squaredNorm() / pow(Vector3f(0, 0, -1).dot(cs_direction_from_camera), 2);
         intensityValues[m_width * y + x] += radience / prob;
         numSamples[m_width * y + x] += 1;
-        m_hit_paths++;
     }
 }
 

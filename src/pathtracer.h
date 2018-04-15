@@ -43,7 +43,6 @@ private:
     void traceToCamera(int *numSamples, Eigen::Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Eigen::Vector3f flux);
 
     const bool LIGHT_TRACING_ONLY = true;
-    float m_hit_paths = 0.f;
 
     //BDPT specific functions
 
