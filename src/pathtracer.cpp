@@ -206,8 +206,9 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
 
 //FUNCTIONS FOR COMPUTING CONTRIBUTION FOR BIDIRECTIONAL
-Vector3f PathTracer::combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
-    int num_eye_nodes; = eye_path.size();
+
+Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
+    int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
     Vector3f weighted_contribution(0, 0, 0);
     for (int i = 0; i < num_eye_nodes; i++) {
@@ -218,9 +219,11 @@ Vector3f PathTracer::combinePaths(const std::vector<PathNode> &eye_path, const s
         for (int j = 0; j < num_light_nodes; j++) {
 
             //do I need to check if connection point is also a specular surface?
-            Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
-            float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
-            weighted_contribution += weight * contrib;
+            if (lightIsVisible(eye_path[i].position, light_path[j].position, scene)) {
+                Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
+                float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
+                weighted_contribution += weight * contrib;
+            }
         }
     }
     return weighted_contribution;
@@ -357,7 +360,7 @@ Vector3f PathTracer::computeLightContrib(const std::vector<PathNode> &light_path
 
 /**
  * Computes the differential throughput of a ray between
- * two nodes.
+ * two nodes. Returns |cos(theta_out) * cos(theta_in)| / distSqaured.
  *
  * @brief PathTracer::getDifferentialThroughput
  * @param node1
@@ -372,7 +375,7 @@ float PathTracer::getDifferentialThroughput(const PathNode &node1, const PathNod
     //check this for throughput
     float cos_node1 = node1.surface_normal.dot(direction);
     float cos_node2 = node2.surface_normal.dot(-1.f * direction);
-    return cos_node1 * cos_node2 / squared_dist;
+    return fabsf(cos_node1 * cos_node2) / squared_dist;
 }
 
 

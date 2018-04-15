@@ -42,7 +42,7 @@ private:
 
     //BDPT specific functions
 
-    Eigen::Vector3f combinePaths(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
+    Eigen::Vector3f combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
 
 
     Eigen::Vector3f computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
