@@ -22,29 +22,38 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
-    // Initialize the tread pool
-    QThreadPool *threadPool = QThreadPool::globalInstance();
-    std::vector<RenderThread *> threads;
-    threads.resize(m_width * m_output_height);
-
-    // Setup intensity values and logging
     Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
-    StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
 
-    // start each thread
-    for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
-        for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
-            int thread_index = x + (y * m_width);
-            threads[thread_index] = new RenderThread;
-            threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat);
-            threads[thread_index]->setAutoDelete(false);
-            threadPool->start(threads[thread_index]);
+    if (RUN_WITH_MULTITHREADED) {
+        // Initialize the tread pool
+        QThreadPool *threadPool = QThreadPool::globalInstance();
+        std::vector<RenderThread *> threads;
+        threads.resize(m_width * m_output_height);
+
+        // Setup intensity values and logging
+        StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
+
+        // start each thread
+        for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
+            for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
+                int thread_index = x + (y * m_width);
+                threads[thread_index] = new RenderThread;
+                threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat);
+                threads[thread_index]->setAutoDelete(false);
+                threadPool->start(threads[thread_index]);
+            }
+        }
+
+        // Wait for rendering to finish
+        threadPool->waitForDone();
+    } else {
+        for(int y = 0; y < m_output_height; y ++) {
+            for(int x = 0; x < m_width; x ++) {
+                tracePixel(x, y, scene, intensityValues, invViewMat);
+            }
         }
     }
-
-    // Wait for rendering to finish
-    threadPool->waitForDone();
 
     toneMap(imageData, intensityValues);
 }
