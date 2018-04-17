@@ -45,6 +45,10 @@ bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector
 
     IntersectionInfo i;
     if(scene.getBVH().getIntersection(ray, &i, false)) {
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        if (t->getNormal(i).dot(to_position2) > 0) {
+            return false;
+        }
         float distance = (i.hit - position2).norm();
         return distance < epsilon;
     }
@@ -63,8 +67,8 @@ Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const 
     } else if (max_eye_index > 0 && max_light_index == 0) {
         return BDPT::computePathTracingContrib(eye_path, light_path[0], max_eye_index);
     } else if (max_eye_index > 0 && max_light_index > 0) {
-//        return BDPT::computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
-        return Vector3f(0, 0, 0);
+        return BDPT::computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
+//        return Vector3f(0, 0, 0);
     }
     return Vector3f(0, 0, 0);
 }

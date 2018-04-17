@@ -22,6 +22,7 @@ Vector3f BSDF::getBsdfFromType(Ray incoming_ray, Vector3f out, Vector3f normal,
     case REFRACTION:
         return refractionBsdf(incoming_ray, out, normal, mat);
     default:
+        std::cout << type << std::endl;
         std::cerr << "(BRDF) Unsupported Material Type"  << std::endl;
         exit(1);
     }

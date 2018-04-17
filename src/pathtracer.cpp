@@ -207,6 +207,12 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
             continue;
         }
 
+        //get rid of emissive term at end
+        int size = light_path.size();
+        if (size > 1 && light_path[size - 1].type == LIGHT) {
+            light_path.pop_back();
+        }
+
 //        std::cout << light_path.size() << std::endl;
         BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
         output_radience += samples.contrib;
