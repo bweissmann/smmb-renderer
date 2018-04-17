@@ -10,7 +10,7 @@
 #include "renderthread.h"
 #include "bsdf.h"
 #include "util/statuslogger.h"
-
+#include "bdpt.h"
 #include <QThreadPool>
 
 using namespace Eigen;
@@ -23,7 +23,8 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
     if (LIGHT_TRACING_ONLY) {
-        lightTrace(imageData, scene);
+        trace(imageData, scene);
+//        lightTrace(imageData, scene);
         return;
     }
 
@@ -54,6 +55,9 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     toneMap(imageData, intensityValues);
 }
 
+
+
+
 void PathTracer::tracePixel(int output_x, int output_y, const Scene& scene,
                             Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix)
 {
@@ -81,6 +85,84 @@ void PathTracer::tracePixel(int output_x, int output_y, const Scene& scene,
 
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
 }
+
+void PathTracer::trace(QRgb *imageData, const Scene& scene) {
+    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
+    Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
+
+    for (int i = 0; i < m_output_height * m_width; i++) {
+        intensityValues[i] = Vector3f(0, 0, 0);
+    }
+
+    for (int i = 0; i < m_output_height; i++) {
+        for (int j = 0; j < m_width; j++) {
+            tracePixel2(j, i, scene, intensityValues, invViewMat);
+        }
+    }
+
+    toneMap(imageData, intensityValues);
+}
+
+void PathTracer::tracePixel2(int output_x, int output_y, const Scene& scene,
+                             Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix) {
+    int pixel_x = output_x;
+    int pixel_y = output_y + m_section_id * m_output_height;
+    int output_index = output_x + output_y * m_width;
+
+    Vector3f output_radience = Vector3f::Zero();
+    Vector3f eye_center(0, 0, 0);
+    Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
+
+
+    for (int i = 0; i < M_NUM_SAMPLES; i++) {
+
+        /* Sample an x and y randomly within the sensor square */
+        float x = pixel_x + MathUtils::random() - 0.5f;
+        float y = pixel_y + MathUtils::random() - 0.5f;
+        Vector3f screen_plane_pos(((2.f * x / m_width) - 1), (1 - (2.f * y / m_image_height)), -1);
+        Vector3f d = (screen_plane_pos - eye_center).normalized();
+        const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
+        const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
+
+        PathNode node = PathNode(world_camera_space_ray.o, eye_normal_world, Vector3f(1, 1, 1),
+                                 Vector3f(0, 0, 0), world_camera_space_ray, 1, 1);
+
+        std::vector<PathNode> eye_path = { node };
+        tracePath(world_camera_space_ray, scene, 0, eye_path);
+        int size = eye_path.size();
+
+        if (size == 1) {
+            continue;
+        }
+        if (eye_path[size - 1].type == LIGHT) {
+
+            //eye to light
+            if (size == 2) {
+                output_radience += BDPT::computeZeroBounceContrib(eye_path[0], eye_path[1]);
+
+            //TODO::fix bug here -> causes screen to go black except for at light
+            //eye to surface to .... light
+            } else if (size > 2) {
+//                output_radience += BDPT::computePathTracingContrib(eye_path, eye_path[size - 1], size - 2);
+            }
+
+        //eye to surface to ... surface
+        } else if (size > 1) {
+            SampledLightInfo light_info = scene.sampleLight();
+            const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
+            SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
+
+            PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(0, 0, 0),
+                                           light_info.emission, ray_info.ray, ray_info.prob, light_info.prob);
+
+            if (lightIsVisible(light_info.position, eye_path[size - 1].position, scene)) {
+                output_radience += BDPT::computePathTracingContrib(eye_path, light_node, size - 1);
+            }
+        }
+    }
+    intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
+}
+
 
 //pass in &path
 Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
@@ -208,9 +290,50 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
 }
 
-
-
 //FUNCTIONS FOR COMPUTING CONTRIBUTION FOR BIDIRECTIONAL
+
+void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &pathNodes) {
+//    float epsilon = .1f;
+//    Ray epsiloned(ray.o + epsilon * ray.d, ray.d, ray.index_of_refraction, ray.is_in_air);
+    IntersectionInfo i;
+
+    if(scene.getBVH().getIntersection(ray, &i, false)) {
+        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
+        const tinyobj::real_t *e = mat.emission; //Emitted color
+        const Vector3f normal = t->getNormal(i); //surface normal
+
+        // Ignore all Emitted Light
+        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
+        if (emitted_light.norm() > 0) {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 0, 0);
+            pathNodes.push_back(node);
+            return;
+        }
+
+        MaterialType type = BSDF::getType(mat);
+        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        const Ray next_ray = next_ray_info.ray;
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+        const float pdf_rr = getContinueProbability(brdf);
+
+        //test up to depth 1
+        if (MathUtils::random() < pdf_rr) {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, pdf_rr * next_ray_info.prob, 0);
+            pathNodes.push_back(node);
+            tracePath(next_ray, scene, depth + 1, pathNodes);
+        } else {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, ((1 - pdf_rr) * next_ray_info.prob), 0);
+            pathNodes.push_back(node);
+        }
+    }
+}
+
+
 
 Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
     int num_eye_nodes = eye_path.size();
@@ -227,9 +350,9 @@ Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode
 
             if (lightIsVisible(eye_path[i].position, light_path[j].position, scene)) {
 
-                Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
-                float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
-                weighted_contribution += weight * contrib;
+//                Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
+//                float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
+//                weighted_contribution += weight * contrib;
 
             }
         }
@@ -237,231 +360,6 @@ Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode
     return weighted_contribution;
 }
 
-Vector3f PathTracer::computePathContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
-                                             int max_eye_index, int max_light_index) {
-    if (max_eye_index == 0 && max_light_index == 0) {
-        return computeZeroBouncePathContrib(eye_path[0], light_path[0]);
-    } else if (max_eye_index > 0 && max_light_index == 0) {
-        return computePathTracingContrib(eye_path, light_path[0], max_eye_index);
-    } else if (max_eye_index > 0 && max_light_index > 0) {
-        return computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
-    }
-    return Vector3f(0, 0, 0);
-}
-
-Vector3f PathTracer::computeZeroBouncePathContrib(const PathNode &eye, const PathNode &light) {
-
-    //TODO:: question about G(x <-> x') when x is eye -> must give normal for to eye?
-    //TODO:: add probability calculation?
-    float throughput = getDifferentialThroughput(eye, light);
-    return light.emission * throughput;
-}
-
-/**
- * Computes the contribution of the eye_path with direct lighting connecting
- * the eye_node at max_eye_index to the light node given. Assumes The two
- * nodes are visible.
- *
- * @brief PathTracer::computePathTracingContrib
- * @param eye_path
- * @param light
- * @param max_eye_index
- * @return
- */
-Vector3f PathTracer::computePathTracingContrib(const std::vector<PathNode> &eye_path,  const PathNode &light, int max_eye_index) {
-
-    //TODO::check if need probability with respect to area
-    Vector3f contrib = computeEyeContrib(eye_path, max_eye_index);
-    PathNode max_eye_node = eye_path[max_eye_index];
-    PathNode previous_eye_node = eye_path[max_eye_index - 1];
-    Vector3f direction = (light.position - max_eye_node.position).normalized();
-    Vector3f brdf = BSDF::getBsdfFromType(previous_eye_node.outgoing_ray, direction, max_eye_node.surface_normal,
-                          max_eye_node.mat, max_eye_node.type);
-    float throughput = getDifferentialThroughput(max_eye_node, light);
-    contrib = contrib.cwiseProduct(brdf);
-    contrib = contrib.cwiseProduct(light.emission) * throughput / light.point_prob;
-    return contrib;
-}
-
-//light tracing case ? do we need to consider it ?
-Vector3f PathTracer::computeLightTracingContrib(const std::vector<PathNode> &light_path,  const PathNode &eye, int max_light_index) {
-    return Vector3f(0, 0, 0);
-}
-
-/**
- * Computes the path radiance by connecting the two subpaths at the indicated
- * indices.
- *
- * @brief PathTracer::computeBidirectionalContrib
- * @param eye_path
- * @param light_path
- * @param max_eye_index
- * @param max_light_index
- * @return
- */
-Vector3f PathTracer::computeBidirectionalContrib(const std::vector<PathNode> &eye_path,  const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index) {
-
-
-    //contribution from separate paths
-    Vector3f light_path_contrib = computeLightContrib(light_path, max_light_index);
-    Vector3f eye_path_contrib = computeEyeContrib(eye_path, max_eye_index);
-
-    PathNode light_node = light_path[max_light_index];
-    PathNode eye_node = eye_path[max_eye_index];
-    Vector3f to_eye_node = (eye_node.position - light_node.position).normalized();
-    Vector3f to_light_node = -1.f * to_eye_node;
-
-    //brdf at light node
-    Ray incoming_ray = light_path[max_light_index - 1].outgoing_ray;
-    Vector3f light_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_eye_node, light_node.surface_normal,
-                                                     light_node.mat, light_node.type);
-
-    //brdf at eye node
-    incoming_ray = eye_path[max_eye_index - 1].outgoing_ray;
-    Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_light_node, eye_node.surface_normal,
-                                                   eye_node.mat, eye_node.type);
-
-    float throughput = getDifferentialThroughput(eye_node, light_node);
-    Vector3f total_contrib = light_path_contrib.cwiseProduct(eye_path_contrib);
-    total_contrib = total_contrib.cwiseProduct(light_node_brdf);
-    total_contrib = total_contrib.cwiseProduct(eye_node_brdf);
-    total_contrib *= throughput;
-    return total_contrib;
-}
-
-/**
- * Computes the contribution from the eye path up to the max
- * index.
- *
- * @brief PathTracer::computeEyeContrib
- * @param eye_path
- * @param max_eye_index
- * @return
- */
-Vector3f PathTracer::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index) {
-    Vector3f contrib(1, 1, 1);
-
-    //TODO::check if need probability with respect to area
-    //TODO:: do I need to deal with probability of picking certain direction.
-    for (int i = 1; i < max_eye_index; i++) {
-        PathNode node =  eye_path[i];
-        contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.directional_prob;
-    }
-    return contrib;
-}
-
-/**
- * Computes the contribution from the light path up to the max index.
- *
- * @brief PathTracer::computeLightContrib
- * @param light_path
- * @param max_light_index
- * @return
- */
-Vector3f PathTracer::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
-
-    //TODO::check if need probability with respect to area
-    Vector3f contrib = light_path[0].emission / light_path[0].point_prob; //going to be direcitonal prob
-    for (int i = 1; i < max_light_index; i++) {
-        PathNode light_node = light_path[i];
-
-        //TODO:: check that I am multiplying by the right constant in light-tracing
-        float constant = light_node.surface_normal.dot(light_node.outgoing_ray.d) / light_node.directional_prob;
-        contrib = contrib.cwiseProduct(light_node.brdf) * constant;
-    }
-    return contrib;
-}
-
-/**
- * Computes the differential throughput of a ray between
- * two nodes. Computes and returns the following:
- * |cos(theta_out) * cos(theta_in)| / dist_sqaured.
- *
- * @brief PathTracer::getDifferentialThroughput
- * @param node1
- * @param node2
- * @return
- */
-float PathTracer::getDifferentialThroughput(const PathNode &node1, const PathNode &node2) {
-    Vector3f direction = node2.position - node1.position;
-    float squared_dist = direction.squaredNorm();
-    direction.normalize();
-
-    //check this for throughput
-    float cos_node1 = node1.surface_normal.dot(direction);
-    float cos_node2 = node2.surface_normal.dot(-1.f * direction);
-    return fabsf(cos_node1 * cos_node2) / squared_dist;
-}
-
-
-//TODO:: figure out edge cases / check
-float PathTracer::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
-                                    int max_eye_index, int max_light_index) {
-    float combined_prob = 1.f;
-    float prob_sum = 0.f;
-
-    const PathNode *node = &eye_path[max_eye_index];
-    const PathNode *previous = &eye_path[max_eye_index - 1];
-
-    for (int i = max_light_index; i > 0; i++) {
-        Vector3f from_old_node = (node->position - previous->position).normalized();
-        Vector3f to_new_node = (light_path[i].position - node->position).normalized();
-
-        float prob = BSDF::getBsdfDirectionalProb(from_old_node, to_new_node, node->surface_normal, node->mat, node->type, 1.f);
-        float prob_to_light_node = light_path[i - 1].directional_prob;
-
-        combined_prob *= powf(prob/prob_to_light_node, 2);
-        prob_sum += combined_prob;
-        previous = node;
-        node = &light_path[i];
-    }
-
-    combined_prob = 1.f;
-    node = &light_path[max_light_index];
-    previous = &light_path[max_eye_index - 1];
-    for (int i = max_eye_index; i > 0; i++) {
-        Vector3f from_old_node = (node->position - previous->position).normalized();
-        Vector3f to_new_node = (eye_path[i].position - node->position).normalized();
-        float prob = BSDF::getBsdfDirectionalProb(from_old_node, to_new_node, node->surface_normal, node->mat, node->type, 1.f);
-        float prob_to_eye_node = eye_path[i - 1].directional_prob;
-        combined_prob *= powf(prob_to_eye_node / prob, 2);
-        prob_sum += combined_prob;
-        previous = node;
-        node = &light_path[i];
-    }
-
-    //TODO::what to do for paths where light = 0 or eye = 0 (as max)
-    return 1.f / prob_sum;
-}
-
-//might be able to delete this
-float PathTracer::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
-                             int max_eye_index, int max_light_index) {
-
-    float eye_prob = 1.f; //probability of picking eye point is 1
-
-    //probability at point i is probability of outgoing directon at i - 1 * cosine / distance squared
-    for (int i = 1; i <= max_eye_index; i++) {
-        Vector3f connecting_ray = eye_path[i - 1].position - eye_path[i].position;
-        float squared_dist = connecting_ray.squaredNorm();
-        connecting_ray.normalized();
-        float cosine_r = eye_path[i].surface_normal.dot(connecting_ray);
-        eye_prob *= eye_path[i - 1].directional_prob * cosine_r / squared_dist;
-    }
-
-    float light_prob = light_path[0].point_prob; //probability of selecting that point
-    for (int i = 1; i <= max_light_index; i++) {
-        Vector3f connecting_ray = light_path[i - 1].position - light_path[i].position;
-        float squared_dist = connecting_ray.squaredNorm();
-        connecting_ray.normalized();
-        float cosine_r = light_path[i].surface_normal.dot(connecting_ray);
-        light_prob *= light_path[i - 1].directional_prob * cosine_r / squared_dist;
-    }
-
-    //TODO:: what about connecting probabilities?
-
-    return eye_prob * light_prob;
-}
 
 void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
 

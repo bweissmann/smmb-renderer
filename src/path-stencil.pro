@@ -31,7 +31,8 @@ SOURCES += main.cpp \
     SampleRay.cpp \
     renderthread.cpp \
     bsdf.cpp \
-    util/statuslogger.cpp
+    util/statuslogger.cpp \
+    bdpt.cpp
 
 HEADERS += \
     pathtracer.h \
@@ -359,4 +360,5 @@ HEADERS += \
     renderthread.h \
     bsdf.h \
     util/statuslogger.h \
-    util/pathnode.h
+    util/pathnode.h \
+    bdpt.h
