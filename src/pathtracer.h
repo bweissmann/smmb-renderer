@@ -21,7 +21,7 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 100;
+    const int M_NUM_SAMPLES = 500;
 
     /* Helpers for parallelism and logging */
     const int PARALLEL_RANGE = 50;
@@ -42,9 +42,20 @@ private:
     void traceLightRay(int *numSamples, Eigen::Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Eigen::Vector3f flux);
     void traceToCamera(int *numSamples, Eigen::Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Eigen::Vector3f flux);
 
+
+
     const bool LIGHT_TRACING_ONLY = true;
-    const int num_paths = 1e8;
+    const double num_paths = 1e7;
+    int m_num_hits;
     //BDPT specific functions
+
+
+    void bidirectionalTrace(QRgb *imageData, const Scene &scene);
+
+    void tracePixelBidirectional(int output_x, int output_y, const Scene& scene,
+                            Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
+    void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &pathNodes);
+
 
     Eigen::Vector3f combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
 
