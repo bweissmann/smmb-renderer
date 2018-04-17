@@ -18,9 +18,6 @@ public:
 
     void trace(QRgb *imageData, const Scene& scene);
 
-    void tracePixel2(int output_x, int output_y, const Scene& scene,
-                     Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
-
     void tracePixel3(int output_x, int output_y, const Scene& scene,
                      Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
 
@@ -40,7 +37,6 @@ private:
     bool lightIsVisible(Eigen::Vector3f light_position, Eigen::Vector3f surface_position, const Scene& scene);
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
-
 
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &pathNodes);
 

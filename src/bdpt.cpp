@@ -6,18 +6,20 @@ BDPT::BDPT() {
 
 }
 
+
 BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
     BDPT_Samples samples = BDPT_Samples();
-
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
 
-//    Vector3f weighted_contribution(0, 0, 0);
-
     for (int i = 1; i < num_eye_nodes; i++) {
         int max_eye_index = i;
+
+        //for specular and refraction, do not combine
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
+
+        //if the eye path finished on a light source, compute the radiance.
         } else if (eye_path[i].type == LIGHT) {
             samples.contrib  += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0);
             samples.num_samples++;
@@ -37,6 +39,16 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
     return samples;
 }
 
+/**
+ * Given the two positions, this function checks if
+ * the two positions can be connected by an edge.
+ *
+ * @brief BDPT::isVisible
+ * @param scene
+ * @param position1
+ * @param position2
+ * @return
+ */
 bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector3f &position2) {
     float epsilon = 0.001; // Epsilon for distance to the light
 
@@ -55,40 +67,43 @@ bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector
     return false;
 }
 
-
-
-
+/**
+ * Computes the contribution.
+ *
+ * @brief BDPT::computeContribution
+ * @param eye_path
+ * @param light_path
+ * @param max_eye_index
+ * @param max_light_index
+ * @return
+ */
 Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                    int max_eye_index, int max_light_index) {
 
     if (max_eye_index == 0 && max_light_index == 0) {
-//        return Vector3f(0, 0, 0);
         return BDPT::computeZeroBounceContrib(eye_path[0], light_path[0]);
     } else if (max_eye_index > 0 && max_light_index == 0) {
         return BDPT::computePathTracingContrib(eye_path, light_path[0], max_eye_index);
     } else if (max_eye_index > 0 && max_light_index > 0) {
         return BDPT::computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
-//        return Vector3f(0, 0, 0);
     }
     return Vector3f(0, 0, 0);
 }
 
-
-
-//TODO:: why do we not multiply by the throughput??
-Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
-
-//    float throughput = BDPT::getDifferentialThroughput(eye.position, eye.surface_normal, light.position, light.surface_normal);
-//    return light.emission * throughput;
-
-    return light.emission;
-}
-
-
+/**
+ * Computes the contribution for the case that is
+ * equivalent to path tracing with direct lighting
+ * at the end of the path.
+ *
+ * @brief BDPT::computePathTracingContrib
+ * @param eye_path
+ * @param light
+ * @param max_eye_index
+ * @return
+ */
 Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, const PathNode &light, int max_eye_index) {
 
     //TODO::check if need probability with respect to area
-//    return Vector3f(0, 0, 0);
 
     Vector3f contrib = max_eye_index > 1 ? computeEyeContrib(eye_path, max_eye_index) : Vector3f(1, 1, 1);
     PathNode max_eye_node = eye_path[max_eye_index];
@@ -105,12 +120,31 @@ Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, 
     return contrib;
 }
 
+//TODO:: why do we not multiply by the throughput??
+Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
+
+//    float throughput = BDPT::getDifferentialThroughput(eye.position, eye.surface_normal, light.position, light.surface_normal);
+//    return light.emission * throughput;
+
+    return light.emission;
+}
 
 Vector3f BDPT::computeLightTracingContrib(const std::vector<PathNode> &light_path, const PathNode &eye, int max_light_index) {
     return Vector3f(0, 0, 0);
 }
 
 
+/**
+ * Computes the radiance for the combined eye and light
+ * paths.
+ *
+ * @brief BDPT::computeBidirectionalContrib
+ * @param eye_path
+ * @param light_path
+ * @param max_eye_index
+ * @param max_light_index
+ * @return
+ */
 Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                            int max_eye_index, int max_light_index) {
 
@@ -133,6 +167,7 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
     Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_light_node, eye_node.surface_normal,
                                                    eye_node.mat, eye_node.type);
 
+    //TODO:: ask aboyt throughput
     float throughput = getDifferentialThroughput(eye_node.position, eye_node.surface_normal, light_node.position, light_node.surface_normal);
     Vector3f total_contrib = light_path_contrib.cwiseProduct(eye_path_contrib);
     total_contrib = total_contrib.cwiseProduct(light_node_brdf);
@@ -143,8 +178,23 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
 
 }
 
-
-
+/**
+ * Computes the light contribution
+ *
+ * Computes the contribution of light from the
+ * eye path. For every node in the path except
+ * for the first one (the eye node),
+ * the brdf is multiplied by the cosine of the outgong
+ * ray with the normal and the contribution so far.
+ * This product is then divided by the directional
+ * probability
+ * of taking that outgoing ray.
+ *
+ * @brief BDPT::computeEyeContrib
+ * @param eye_path
+ * @param max_eye_index
+ * @return
+ */
 Vector3f BDPT::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_eye_index) {
     Vector3f contrib(1, 1, 1);
 
@@ -156,11 +206,23 @@ Vector3f BDPT::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_
             contrib = contrib.cwiseProduct(node.emission);
             continue;
         }
+
+        //TODO::check if I am taking the ray direction
         contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.directional_prob;
     }
     return contrib;
 }
 
+/**
+ * Computes the radiance that travels from
+ * the light that reaches the node at
+ * the index equal to max_light_index.
+ *
+ * @brief BDPT::computeLightContrib
+ * @param light_path - light path vector
+ * @param max_light_index - index of node to calculate the radiance
+ * @return radiance up to node at max_light_index
+ */
 Vector3f BDPT::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
 
     //TODO::check if need probability with respect to area
@@ -175,13 +237,23 @@ Vector3f BDPT::computeLightContrib(const std::vector<PathNode> &light_path, int 
     return contrib;
 }
 
+/**
+ * Computes and outputs the differential throughput
+ * that connects these two positions with the
+ * given normals.
+ *
+ * @brief BDPT::getDifferentialThroughput
+ * @param position1 - position 1
+ * @param normal1 - normal 1
+ * @param position2 - position 2
+ * @param normal2 - normal 2
+ * @return differential throughput
+ */
 float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f &normal1,
                                       const Vector3f &position2, const Vector3f &normal2) {
     Vector3f direction = position2 - position1;
     float squared_dist = direction.squaredNorm();
     direction.normalize();
-
-    //check this for throughput
     float cos_node1 = normal1.dot(direction);
     float cos_node2 = normal2.dot(-1.f * direction);
 
@@ -189,6 +261,7 @@ float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f 
     return fmax(0, cos_node1 * cos_node2) / squared_dist;
 }
 
+//TODO:: compute path weights
 float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                  int max_eye_index, int max_light_index) {
     float combined_prob = 1.f;
