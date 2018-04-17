@@ -96,7 +96,7 @@ void PathTracer::trace(QRgb *imageData, const Scene& scene) {
 
     for (int i = 0; i < m_output_height; i++) {
         for (int j = 0; j < m_width; j++) {
-            tracePixel2(j, i, scene, intensityValues, invViewMat);
+            tracePixel3(j, i, scene, intensityValues, invViewMat);
         }
     }
 
@@ -143,7 +143,11 @@ void PathTracer::tracePixel2(int output_x, int output_y, const Scene& scene,
             //TODO::fix bug here -> causes screen to go black except for at light
             //eye to surface to .... light
             } else if (size > 2) {
-//                output_radience += BDPT::computePathTracingContrib(eye_path, eye_path[size - 1], size - 2);
+                assert(eye_path[size - 1].emission.norm() > 0);
+                output_radience += BDPT::computePathTracingContrib(eye_path, eye_path[size - 1], size - 2);
+//                output_radience += BDPT::computeEyeContrib(eye_path, size);
+
+                continue;
             }
 
         //eye to surface to ... surface
@@ -159,7 +163,47 @@ void PathTracer::tracePixel2(int output_x, int output_y, const Scene& scene,
                 output_radience += BDPT::computePathTracingContrib(eye_path, light_node, size - 1);
             }
         }
+
     }
+    intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
+}
+
+
+
+void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
+                             Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix) {
+    int pixel_x = output_x;
+    int pixel_y = output_y + m_section_id * m_output_height;
+    int output_index = output_x + output_y * m_width;
+
+    Vector3f output_radience = Vector3f::Zero();
+    Vector3f eye_center(0, 0, 0);
+    Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
+
+    for (int i = 0; i < M_NUM_SAMPLES; i++) {
+
+        /* Sample an x and y randomly within the sensor square */
+        float x = pixel_x + MathUtils::random() - 0.5f;
+        float y = pixel_y + MathUtils::random() - 0.5f;
+        Vector3f screen_plane_pos(((2.f * x / m_width) - 1), (1 - (2.f * y / m_image_height)), -1);
+        Vector3f d = (screen_plane_pos - eye_center).normalized();
+        const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
+        const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
+        PathNode eye_node = PathNode(world_camera_space_ray.o, eye_normal_world, Vector3f(1, 1, 1),
+                                 Vector3f(0, 0, 0), world_camera_space_ray, 1, 1);
+
+        SampledLightInfo light_info = scene.sampleLight();
+        const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
+        SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
+        PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(0, 0, 0),
+                                       light_info.emission, ray_info.ray, ray_info.prob, light_info.prob);
+
+        std::vector<PathNode> eye_path = { eye_node };
+        std::vector<PathNode> light_path = { light_node };
+
+        tracePath(world_camera_space_ray, scene, 0, eye_path);
+        output_radience += BDPT::combinePaths(scene, eye_path, light_path);
+      }
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
 }
 
@@ -307,9 +351,9 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         // Ignore all Emitted Light
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0) {
-            Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 0, 0);
-            pathNodes.push_back(node);
+//            Vector3f N = ray.is_in_air ? normal : -normal;
+//            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
+//            pathNodes.push_back(node);
             return;
         }
 
@@ -330,134 +374,6 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, ((1 - pdf_rr) * next_ray_info.prob), 0);
             pathNodes.push_back(node);
         }
-    }
-}
-
-
-
-Vector3f PathTracer::combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
-    int num_eye_nodes = eye_path.size();
-    int num_light_nodes = light_path.size();
-    Vector3f weighted_contribution(0, 0, 0);
-    for (int i = 0; i < num_eye_nodes; i++) {
-        int max_eye_index = i;
-        if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
-            continue;
-        }
-        for (int j = 0; j < num_light_nodes; j++) {
-
-            //do I need to check if connection point is also a specular surface?
-
-            if (lightIsVisible(eye_path[i].position, light_path[j].position, scene)) {
-
-//                Vector3f contrib = computePathContribution(eye_path, light_path, max_eye_index, j);
-//                float weight = computePathWeight(eye_path, light_path, max_eye_index, j);
-//                weighted_contribution += weight * contrib;
-
-            }
-        }
-    }
-    return weighted_contribution;
-}
-
-
-void PathTracer::lightTrace(QRgb *imageData, const Scene &scene) {
-
-    // Setup intensity values and logging
-    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
-    int numSamples[m_width * m_output_height];
-
-    for (int i = 0; i < m_width * m_output_height; i++) {
-        intensityValues[i] = Vector3f(0.f, 0.f, 0.f);
-        numSamples[i] = 0;
-    }
-
-
-    for (int i = 0; i < num_paths; i++) {
-        SampledLightInfo light_info = scene.sampleLight();
-        const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
-        SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
-        traceLightRay(numSamples, intensityValues, ray_info.ray, scene, 0, light_info.prob * ray_info.prob, light_info.emission);
-    }
-
-    for (int i = 0; i < m_width * m_output_height; i++) {
-        std::cout << intensityValues[i].norm() << "/";
-        intensityValues[i] = intensityValues[i] * numSamples[i] / num_paths;
-
-        std::cout << intensityValues[i].norm() << " ";
-    }
-
-    toneMap(imageData, intensityValues);
-}
-
-void PathTracer::traceLightRay(int *numSamples, Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Vector3f flux) {
-//    traceToCamera(numSamples, intensityValues, ray, scene, depth, prob, flux);
-
-    IntersectionInfo i;
-
-    if(scene.getBVH().getIntersection(ray, &i, false)) {
-        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
-        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
-        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
-        const tinyobj::real_t *e = mat.emission; //Emitted color
-        const Vector3f normal = t->getNormal(i); //surface normal
-
-        // Ignore all Emitted Light
-        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
-        if (emitted_light.norm() > 0) {
-            return;
-        }
-
-        MaterialType type = BSDF::getType(mat);
-        float schlick = 1.f;
-
-        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
-
-        const Ray next_ray = next_ray_info.ray;
-        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
-
-        const float pdf_rr = 0.5f;//getContinueProbability(brdf);
-        if (MathUtils::random() < pdf_rr) {
-            // Deal with refraction separately
-
-            // All other material types
-            Vector3f N = ray.is_in_air ? normal : -normal;
-            int next_depth = (type == IDEAL_SPECULAR) ? 0 : depth + 1;
-
-            Vector3f next_flux = flux.cwiseProduct(brdf) * N.dot(next_ray.d);
-            traceLightRay(numSamples, intensityValues, next_ray, scene, next_depth, prob * (next_ray_info.prob * pdf_rr * schlick), next_flux);
-        } else {
-            traceToCamera(numSamples, intensityValues, ray, scene, depth + 1, prob * (1.f - pdf_rr), flux);
-        }
-    } else {
-        traceToCamera(numSamples, intensityValues, ray, scene, depth + 1, prob, flux);
-    }
-}
-
-void PathTracer::traceToCamera(int *numSamples, Vector3f *intensityValues, const Ray& ray, const Scene& scene, int depth, float prob, Vector3f flux) {
-    IntersectionInfo i;
-
-
-
-    const Vector3f eye_center(0, 0, 0);
-    Matrix4f viewMatrix = scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix();
-    Vector4f origin = ray.o.homogeneous();
-    Vector3f cs_origin = (viewMatrix * origin).head<3>();
-    Vector3f cs_direction_to_camera = eye_center - cs_origin;
-    Vector3f cs_direction_from_camera = -cs_direction_to_camera.normalized() / cs_direction_to_camera.normalized().z();
-    Vector3f world_to_camera = (viewMatrix.inverse() * Vector4f(cs_direction_to_camera[0], cs_direction_to_camera[1], cs_direction_to_camera[2], 0)).head<3>();
-    const Ray new_ray(ray.o, world_to_camera, AIR_IOR, true);
-
-    if(scene.getBVH().getIntersection(new_ray, &i, true)) {
-        return;
-    }
-
-    if (abs(cs_direction_from_camera.x()) < 1.f && abs(cs_direction_from_camera.y()) < 1.f) {
-        int x = (cs_direction_from_camera.x() + 1.f) / 2.f * m_width;
-        int y = (1.f - cs_direction_from_camera.y()) / 2.f * m_output_height;
-        Vector3f radience = flux * cs_direction_from_camera.squaredNorm() / pow(Vector3f(0, 0, -1).dot(cs_direction_from_camera), 2);
-        intensityValues[m_width * y + x] += radience / prob;
-        numSamples[m_width * y + x] += 1;
     }
 }
 

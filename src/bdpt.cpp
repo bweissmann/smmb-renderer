@@ -6,69 +6,90 @@ BDPT::BDPT() {
 
 }
 
-Vector3f combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
+Vector3f BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
+
     Vector3f weighted_contribution(0, 0, 0);
-    for (int i = 0; i < num_eye_nodes; i++) {
+
+    for (int i = num_eye_nodes - 1; i < num_eye_nodes; i++) {
         int max_eye_index = i;
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
         }
+
         for (int j = 0; j < num_light_nodes; j++) {
 
             //do I need to check if connection point is also a specular surface?
-
-//            if (lightIsVisible(eye_path[i].position, light_path[j].position, scene)) {
-
+            if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, max_eye_index, j);
-                float weight = BDPT::computePathWeight(eye_path, light_path, max_eye_index, j);
-                weighted_contribution += weight * contrib;
-
-//            }
+//                float weight = BDPT::computePathWeight(eye_path, light_path, max_eye_index, j);
+                weighted_contribution += contrib;
+            }
         }
     }
     return weighted_contribution;
 }
+
+bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector3f &position2) {
+    float epsilon = 0.001; // Epsilon for distance to the light
+
+    Vector3f to_position2 = (position2 - position1).normalized();
+    Ray ray(position1, to_position2, AIR_IOR, true);
+
+    IntersectionInfo i;
+    if(scene.getBVH().getIntersection(ray, &i, false)) {
+        float distance = (i.hit - position2).norm();
+        return distance < epsilon;
+    }
+    return false;
+}
+
+
 
 
 Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                    int max_eye_index, int max_light_index) {
 
     if (max_eye_index == 0 && max_light_index == 0) {
-        return BDPT::computeZeroBounceContrib(eye_path[0], light_path[0]);
+        return Vector3f(0, 0, 0);
+//        return BDPT::computeZeroBounceContrib(eye_path[0], light_path[0]);
     } else if (max_eye_index > 0 && max_light_index == 0) {
         return BDPT::computePathTracingContrib(eye_path, light_path[0], max_eye_index);
     } else if (max_eye_index > 0 && max_light_index > 0) {
-        return BDPT::computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
+//        return BDPT::computeBidirectionalContrib(eye_path, light_path, max_eye_index, max_light_index);
+        return Vector3f(0, 0, 0);
     }
     return Vector3f(0, 0, 0);
-
 }
 
 
+
+//TODO:: why do we not multiply by the throughput??
 Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
 
-    //TODO:: question about G(x <-> x') when x is eye -> must give normal for to eye?
-    //TODO:: add probability calculation?
-
 //    float throughput = BDPT::getDifferentialThroughput(eye.position, eye.surface_normal, light.position, light.surface_normal);
-    return light.emission; /** throughput;*/
+//    return light.emission * throughput;
+
+    return light.emission;
 }
 
 
 Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, const PathNode &light, int max_eye_index) {
 
     //TODO::check if need probability with respect to area
+//    return Vector3f(0, 0, 0);
 
-    Vector3f contrib = computeEyeContrib(eye_path, max_eye_index);
+    Vector3f contrib = max_eye_index > 1 ? computeEyeContrib(eye_path, max_eye_index) : Vector3f(1, 1, 1);
     PathNode max_eye_node = eye_path[max_eye_index];
     PathNode previous_eye_node = eye_path[max_eye_index - 1];
     Vector3f direction = (light.position - max_eye_node.position).normalized();
     Vector3f brdf = BSDF::getBsdfFromType(previous_eye_node.outgoing_ray, direction, max_eye_node.surface_normal,
                           max_eye_node.mat, max_eye_node.type);
+
     float throughput = getDifferentialThroughput(max_eye_node.position, max_eye_node.surface_normal,
                                                  light.position, light.surface_normal);
+
     contrib = contrib.cwiseProduct(brdf);
     contrib = contrib.cwiseProduct(light.emission) * throughput / light.point_prob;
     return contrib;
@@ -121,6 +142,10 @@ Vector3f BDPT::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_
     //TODO:: do I need to deal with probability of picking certain direction.
     for (int i = 1; i < max_eye_index; i++) {
         PathNode node =  eye_path[i];
+        if (node.type == LIGHT) {
+            contrib = contrib.cwiseProduct(node.emission);
+            continue;
+        }
         contrib = contrib.cwiseProduct(node.brdf) * node.surface_normal.dot(node.outgoing_ray.d) / node.directional_prob;
     }
     return contrib;
@@ -149,7 +174,9 @@ float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f 
     //check this for throughput
     float cos_node1 = normal1.dot(direction);
     float cos_node2 = normal2.dot(-1.f * direction);
-    return fabsf(cos_node1 * cos_node2) / squared_dist;
+
+    //TODO:: why do I need this fmax part?
+    return fmax(0, cos_node1 * cos_node2) / squared_dist;
 }
 
 float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,

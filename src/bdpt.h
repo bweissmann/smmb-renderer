@@ -9,8 +9,11 @@ class BDPT
 public:
     BDPT();
 
-    static Eigen::Vector3f combinePaths(const Scene& scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
+//    static Eigen::Vector3f createPaths();
 
+    static bool isVisible(const Scene&scene, const Eigen::Vector3f &position1, const Eigen::Vector3f &position2);
+
+    static Eigen::Vector3f combinePaths(const Scene&scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
 
     static Eigen::Vector3f computeContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
 
