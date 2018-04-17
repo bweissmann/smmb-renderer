@@ -6,29 +6,35 @@ BDPT::BDPT() {
 
 }
 
-Vector3f BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
+BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
+    BDPT_Samples samples = BDPT_Samples();
+
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
 
-    Vector3f weighted_contribution(0, 0, 0);
+//    Vector3f weighted_contribution(0, 0, 0);
 
-    for (int i = num_eye_nodes - 1; i < num_eye_nodes; i++) {
+    for (int i = 1; i < num_eye_nodes; i++) {
         int max_eye_index = i;
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
+        } else if (eye_path[i].type == LIGHT) {
+            samples.contrib  += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0);
+            samples.num_samples++;
+            continue;
         }
-
         for (int j = 0; j < num_light_nodes; j++) {
 
             //do I need to check if connection point is also a specular surface?
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, max_eye_index, j);
 //                float weight = BDPT::computePathWeight(eye_path, light_path, max_eye_index, j);
-                weighted_contribution += contrib;
+                samples.contrib += contrib;
+                samples.num_samples++;
             }
         }
     }
-    return weighted_contribution;
+    return samples;
 }
 
 bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector3f &position2) {
@@ -52,8 +58,8 @@ Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const 
                                    int max_eye_index, int max_light_index) {
 
     if (max_eye_index == 0 && max_light_index == 0) {
-        return Vector3f(0, 0, 0);
-//        return BDPT::computeZeroBounceContrib(eye_path[0], light_path[0]);
+//        return Vector3f(0, 0, 0);
+        return BDPT::computeZeroBounceContrib(eye_path[0], light_path[0]);
     } else if (max_eye_index > 0 && max_light_index == 0) {
         return BDPT::computePathTracingContrib(eye_path, light_path[0], max_eye_index);
     } else if (max_eye_index > 0 && max_light_index > 0) {
