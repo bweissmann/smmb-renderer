@@ -12,8 +12,8 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
 
+    //currently ignoring the case when the we connect light path directly to eye node
     for (int i = 1; i < num_eye_nodes; i++) {
-        int max_eye_index = i;
 
         //for specular and refraction, do not combine
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
@@ -29,8 +29,8 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
 
             //do I need to check if connection point is also a specular surface?
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
-                Vector3f contrib = BDPT::computeContribution(eye_path, light_path, max_eye_index, j);
-//                float weight = BDPT::computePathWeight(eye_path, light_path, max_eye_index, j);
+                Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
+//                float weight = BDPT::computePathWeight(eye_path, light_path, i, j);
                 samples.contrib += contrib;
                 samples.num_samples++;
             }

@@ -19,11 +19,11 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
 
     switch (type) {
     case IDEAL_DIFFUSE:
-//        return sampleIdealDiffuseImportance(position, incoming_ray, surface_normal);
-        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
+        return sampleIdealDiffuseImportance(position, incoming_ray, surface_normal);
+//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
     case GLOSSY_SPECULAR:
-        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
-//        return sampleGlossySpecularImportance(position, incoming_ray, surface_normal, mat);
+//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
+        return sampleGlossySpecularImportance(position, incoming_ray, surface_normal, mat);
     case IDEAL_SPECULAR:
         return idealSpecularReflection(position, incoming_ray, surface_normal);
     case REFRACTION:
@@ -36,10 +36,10 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
 
 SampledRayInfo SampleRay::uniformSampleHemisphere(const Vector3f &position, const Ray &incoming_ray,
                                                   const Vector3f &surface_normal) {
-    float phi = acos(MathUtils::random());
+    float phi = acosf(MathUtils::random());
     float theta = 2.f * M_PI * MathUtils::random();
 
-    const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
+    const Vector3f tangentspace_direction = Vector3f(sinf(phi) * cosf(theta), sinf(phi) * sinf(theta), cosf(phi));
     const Vector3f worldspace_direction = tangentToWorldSpace(surface_normal, tangentspace_direction);
 
     Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
@@ -53,7 +53,7 @@ SampledRayInfo SampleRay::sampleIdealDiffuseImportance(const Vector3f &position,
 
     //TODO::DETERMINE WHICH OF THREE METHODS ARE RIGHT
 
-        float phi = acos(sqrt(MathUtils::random()));
+        float phi = acosf(sqrt(MathUtils::random()));
     float theta = 2.f * M_PI * MathUtils::random();
 
     const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
@@ -83,7 +83,7 @@ SampledRayInfo SampleRay::sampleGlossySpecularImportance(const Vector3f &positio
                                                       const Vector3f &surface_normal, const tinyobj::material_t& mat) {
     Vector3f reflected_direction = MathUtils::reflect(incoming_ray.d, surface_normal);
     float n = mat.shininess;
-    float phi = acos(pow(MathUtils::random(), 1.f /(n + 1.f)));
+    float phi = acosf(pow(MathUtils::random(), 1.f /(n + 1.f)));
     float theta = 2.f * M_PI * MathUtils::random();
 
     const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));

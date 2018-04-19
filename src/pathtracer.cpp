@@ -12,6 +12,7 @@
 #include "util/statuslogger.h"
 #include "bdpt.h"
 #include <QThreadPool>
+#include "bdpt2.h"
 
 using namespace Eigen;
 
@@ -99,6 +100,7 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0) {
             return (depth == 0) ? emitted_light : Vector3f(0.f, 0.f, 0.f);
+//            return emitted_light;
         }
 
         MaterialType type = BSDF::getType(mat);
@@ -125,20 +127,21 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         }
 
         // Direct Light Contribution
-        SampledLightInfo light_info = scene.sampleLight();
-        if (lightIsVisible(light_info.position, i.hit, scene)) {
-            int num_direct_light = 10;
-            for (int j = 0; j < num_direct_light; j++) {
-                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
-            }
-        }
+//        int num_direct_light = 10;
+//        for (int j = 0; j < num_direct_light; j++) {
+//            SampledLightInfo light_info = scene.sampleLight();
+//            if (lightIsVisible(light_info.position, i.hit, scene)) {
+//                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+//            }
+//        }
 
         const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
 
         const Ray next_ray = next_ray_info.ray;
         const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
 
-        const float pdf_rr = getContinueProbability(brdf);
+        float pdf_rr = getContinueProbability(brdf);
+//        if (depth < 3) pdf_rr = 1.f; // TEMP LONG PATHS
         if (MathUtils::random() < pdf_rr) {
             // Deal with refraction separately
             if (type == REFRACTION) {
@@ -154,6 +157,14 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
             const Vector3f reflected_light = traceRay(next_ray, scene, next_depth).cwiseProduct(brdf) * N.dot(next_ray.d)
                     / (next_ray_info.prob * pdf_rr * schlick);
             total_light += reflected_light;
+        } else {
+            int num_direct_light = 1;
+            for (int j = 0; j < num_direct_light; j++) {
+                SampledLightInfo light_info = scene.sampleLight();
+                if (lightIsVisible(light_info.position, i.hit, scene)) {
+                    total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+                }
+            }
         }
     }
 
@@ -260,7 +271,7 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
         SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
         PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(0, 0, 0),
-                                       light_info.emission, ray_info.ray, ray_info.prob, light_info.prob);
+                                       light_info.emission, ray_info.ray, LIGHT, ray_info.prob, light_info.prob);
 
 
         //trace the paths
@@ -269,21 +280,48 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
         tracePath(world_camera_space_ray, scene, 0, eye_path);
         tracePath(ray_info.ray, scene, 0, light_path);
 
-        //eye path did not intersect with any surface
         if (eye_path.size() == 1) {
             continue;
         }
 
-        //get rid of emissive term at end of the light path
-        int size = light_path.size();
-        if (size > 1 && light_path[size - 1].type == LIGHT) {
-            light_path.pop_back();
+        Vector3f sample = BDPT2::computeStuff(scene, eye_path, light_path);
+        if (sample.norm() == 0) {
+            continue;
         }
+        total++;
+        output_radience += sample;
+
+        //get rid of emissive term at end of the light path
+//        int size = light_path.size();
+//        if (size > 1 && light_path[size - 1].type == LIGHT) {
+//            light_path.pop_back();
+//        }
+
+//        if (size < 2) {
+//            continue;
+//        }
+
+//        size = eye_path.size();
+//        if (size > 1 && eye_path[size - 1].type == LIGHT) {
+//            eye_path.pop_back();
+//        }
+
+//        if (size < 3) {
+//            continue;
+//        }
+
+//        Vector3f sample = BDPT2::computeRadiance(scene, eye_path, light_path);
+//        output_radience += sample;
+//        total++;
 
         //samples the combined path
-        BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
-        output_radience += samples.contrib; //contribution total
-        total += samples.num_samples; //total number of sampled path
+//        BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
+//        output_radience += samples.contrib;
+//        total += samples.num_samples;
+//        Sample samples = BDPT2::combinePaths(scene, eye_path, light_path);
+//        output_radience += samples.radiance; //contribution total
+//        total += samples.number_samples; //total number of sampled path
+
       }
     intensityValues[output_index] = output_radience / total;
 }
@@ -305,10 +343,10 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         if (emitted_light.norm() > 0) {
             Vector3f N = ray.is_in_air ? normal : -normal;
 
-            if (N.dot(ray.d) < 0) { //coming towards it
+//            if (N.dot(ray.d) < 0) { //coming towards it
                 PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
                 pathNodes.push_back(node);
-            }
+//            }
             return;
         }
 

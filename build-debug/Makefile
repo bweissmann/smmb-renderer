@@ -63,7 +63,8 @@ SOURCES       = ../src/main.cpp \
 		../src/renderthread.cpp \
 		../src/bsdf.cpp \
 		../src/util/statuslogger.cpp \
-		../src/bdpt.cpp 
+		../src/bdpt.cpp \
+		../src/bdpt2.cpp 
 OBJECTS       = main.o \
 		pathtracer.o \
 		scene.o \
@@ -79,7 +80,8 @@ OBJECTS       = main.o \
 		renderthread.o \
 		bsdf.o \
 		statuslogger.o \
-		bdpt.o
+		bdpt.o \
+		bdpt2.o
 DIST          = ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_pre.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/qdevice.pri \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/device_config.prf \
@@ -212,6 +214,7 @@ DIST          = ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_pre.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/qt_config.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/macx-clang/qmake.conf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_post.prf \
+		../src/.qmake.stash \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/exclusive_builds.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/mac/sdk.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/toolchain.prf \
@@ -562,7 +565,8 @@ DIST          = ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_pre.prf \
 		../src/bsdf.h \
 		../src/util/statuslogger.h \
 		../src/util/pathnode.h \
-		../src/bdpt.h ../src/main.cpp \
+		../src/bdpt.h \
+		../src/bdpt2.h ../src/main.cpp \
 		../src/pathtracer.cpp \
 		../src/scene/scene.cpp \
 		../src/BVH/BBox.cpp \
@@ -577,7 +581,8 @@ DIST          = ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_pre.prf \
 		../src/renderthread.cpp \
 		../src/bsdf.cpp \
 		../src/util/statuslogger.cpp \
-		../src/bdpt.cpp
+		../src/bdpt.cpp \
+		../src/bdpt2.cpp
 QMAKE_TARGET  = path-stencil
 DESTDIR       = 
 TARGET        = path-stencil
@@ -721,6 +726,7 @@ Makefile: ../src/path-stencil.pro ../../../../Qt5.7.1/5.7/clang_64/mkspecs/macx-
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/qt_config.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/macx-clang/qmake.conf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_post.prf \
+		.qmake.stash \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/exclusive_builds.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/mac/sdk.prf \
 		../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/toolchain.prf \
@@ -882,6 +888,7 @@ Makefile: ../src/path-stencil.pro ../../../../Qt5.7.1/5.7/clang_64/mkspecs/macx-
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/qt_config.prf:
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/macx-clang/qmake.conf:
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/spec_post.prf:
+.qmake.stash:
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/exclusive_builds.prf:
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/mac/sdk.prf:
 ../../../../Qt5.7.1/5.7/clang_64/mkspecs/features/toolchain.prf:
@@ -924,8 +931,8 @@ dist: distdir FORCE
 distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
-	$(COPY_FILE) --parents ../src/pathtracer.h ../src/scene/scene.h ../src/BVH/BBox.h ../src/BVH/BVH.h ../src/BVH/IntersectionInfo.h ../src/BVH/Log.h ../src/BVH/Object.h ../src/BVH/Ray.h ../src/BVH/Stopwatch.h ../src/Eigen/Cholesky ../src/Eigen/CholmodSupport ../src/Eigen/Core ../src/Eigen/Dense ../src/Eigen/Eigen ../src/Eigen/Eigenvalues ../src/Eigen/Geometry ../src/Eigen/Householder ../src/Eigen/IterativeLinearSolvers ../src/Eigen/Jacobi ../src/Eigen/LU ../src/Eigen/MetisSupport ../src/Eigen/OrderingMethods ../src/Eigen/PardisoSupport ../src/Eigen/PaStiXSupport ../src/Eigen/QR ../src/Eigen/QtAlignedMalloc ../src/Eigen/Sparse ../src/Eigen/SparseCholesky ../src/Eigen/SparseCore ../src/Eigen/SparseLU ../src/Eigen/SparseQR ../src/Eigen/SPQRSupport ../src/Eigen/StdDeque ../src/Eigen/StdList ../src/Eigen/StdVector ../src/Eigen/SuperLUSupport ../src/Eigen/SVD ../src/Eigen/UmfPackSupport ../src/scene/camera.h ../src/scene/basiccamera.h ../src/util/CS123Common.h ../src/util/CS123ISceneParser.h ../src/util/CS123SceneData.h ../src/util/CS123XmlSceneParser.h ../src/scene/shape/Sphere.h ../src/scene/shape/mesh.h ../src/scene/shape/triangle.h ../src/util/tiny_obj_loader.h ../src/BVH/vector3.h ../src/Eigen/src/Cholesky/LDLT.h ../src/Eigen/src/Cholesky/LLT.h ../src/Eigen/src/Cholesky/LLT_LAPACKE.h ../src/Eigen/src/CholmodSupport/CholmodSupport.h ../src/Eigen/src/Core/arch/AltiVec/Complex.h ../src/Eigen/src/Core/arch/AltiVec/MathFunctions.h ../src/Eigen/src/Core/arch/AltiVec/PacketMath.h ../src/Eigen/src/Core/arch/AVX/Complex.h ../src/Eigen/src/Core/arch/AVX/MathFunctions.h ../src/Eigen/src/Core/arch/AVX/PacketMath.h ../src/Eigen/src/Core/arch/AVX/TypeCasting.h ../src/Eigen/src/Core/arch/AVX512/MathFunctions.h ../src/Eigen/src/Core/arch/AVX512/PacketMath.h ../src/Eigen/src/Core/arch/CUDA/Complex.h ../src/Eigen/src/Core/arch/CUDA/Half.h ../src/Eigen/src/Core/arch/CUDA/MathFunctions.h ../src/Eigen/src/Core/arch/CUDA/PacketMath.h ../src/Eigen/src/Core/arch/CUDA/PacketMathHalf.h ../src/Eigen/src/Core/arch/CUDA/TypeCasting.h ../src/Eigen/src/Core/arch/Default/Settings.h ../src/Eigen/src/Core/arch/NEON/Complex.h ../src/Eigen/src/Core/arch/NEON/MathFunctions.h ../src/Eigen/src/Core/arch/NEON/PacketMath.h ../src/Eigen/src/Core/arch/SSE/Complex.h ../src/Eigen/src/Core/arch/SSE/MathFunctions.h ../src/Eigen/src/Core/arch/SSE/PacketMath.h ../src/Eigen/src/Core/arch/SSE/TypeCasting.h ../src/Eigen/src/Core/arch/ZVector/Complex.h ../src/Eigen/src/Core/arch/ZVector/MathFunctions.h ../src/Eigen/src/Core/arch/ZVector/PacketMath.h ../src/Eigen/src/Core/functors/AssignmentFunctors.h ../src/Eigen/src/Core/functors/BinaryFunctors.h ../src/Eigen/src/Core/functors/NullaryFunctors.h ../src/Eigen/src/Core/functors/StlFunctors.h ../src/Eigen/src/Core/functors/TernaryFunctors.h ../src/Eigen/src/Core/functors/UnaryFunctors.h ../src/Eigen/src/Core/products/GeneralBlockPanelKernel.h ../src/Eigen/src/Core/products/GeneralMatrixMatrix.h ../src/Eigen/src/Core/products/GeneralMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h ../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular_BLAS.h ../src/Eigen/src/Core/products/GeneralMatrixVector.h ../src/Eigen/src/Core/products/GeneralMatrixVector_BLAS.h ../src/Eigen/src/Core/products/Parallelizer.h ../src/Eigen/src/Core/products/SelfadjointMatrixMatrix.h ../src/Eigen/src/Core/products/SelfadjointMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/SelfadjointMatrixVector.h ../src/Eigen/src/Core/products/SelfadjointMatrixVector_BLAS.h ../src/Eigen/src/Core/products/SelfadjointProduct.h ../src/Eigen/src/Core/products/SelfadjointRank2Update.h ../src/Eigen/src/Core/products/TriangularMatrixMatrix.h ../src/Eigen/src/Core/products/TriangularMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/TriangularMatrixVector.h ../src/Eigen/src/Core/products/TriangularMatrixVector_BLAS.h ../src/Eigen/src/Core/products/TriangularSolverMatrix.h ../src/Eigen/src/Core/products/TriangularSolverMatrix_BLAS.h ../src/Eigen/src/Core/products/TriangularSolverVector.h ../src/Eigen/src/Core/util/BlasUtil.h ../src/Eigen/src/Core/util/Constants.h ../src/Eigen/src/Core/util/DisableStupidWarnings.h ../src/Eigen/src/Core/util/ForwardDeclarations.h ../src/Eigen/src/Core/util/Macros.h ../src/Eigen/src/Core/util/Memory.h ../src/Eigen/src/Core/util/Meta.h ../src/Eigen/src/Core/util/MKL_support.h ../src/Eigen/src/Core/util/NonMPL2.h ../src/Eigen/src/Core/util/ReenableStupidWarnings.h ../src/Eigen/src/Core/util/StaticAssert.h ../src/Eigen/src/Core/util/XprHelper.h ../src/Eigen/src/Core/Array.h ../src/Eigen/src/Core/ArrayBase.h ../src/Eigen/src/Core/ArrayWrapper.h ../src/Eigen/src/Core/Assign.h ../src/Eigen/src/Core/Assign_MKL.h ../src/Eigen/src/Core/AssignEvaluator.h ../src/Eigen/src/Core/BandMatrix.h ../src/Eigen/src/Core/Block.h ../src/Eigen/src/Core/BooleanRedux.h ../src/Eigen/src/Core/CommaInitializer.h ../src/Eigen/src/Core/ConditionEstimator.h ../src/Eigen/src/Core/CoreEvaluators.h ../src/Eigen/src/Core/CoreIterators.h ../src/Eigen/src/Core/CwiseBinaryOp.h ../src/Eigen/src/Core/CwiseNullaryOp.h ../src/Eigen/src/Core/CwiseTernaryOp.h ../src/Eigen/src/Core/CwiseUnaryOp.h ../src/Eigen/src/Core/CwiseUnaryView.h ../src/Eigen/src/Core/DenseBase.h ../src/Eigen/src/Core/DenseCoeffsBase.h ../src/Eigen/src/Core/DenseStorage.h ../src/Eigen/src/Core/Diagonal.h ../src/Eigen/src/Core/DiagonalMatrix.h ../src/Eigen/src/Core/DiagonalProduct.h ../src/Eigen/src/Core/Dot.h ../src/Eigen/src/Core/EigenBase.h ../src/Eigen/src/Core/ForceAlignedAccess.h ../src/Eigen/src/Core/Fuzzy.h ../src/Eigen/src/Core/GeneralProduct.h ../src/Eigen/src/Core/GenericPacketMath.h ../src/Eigen/src/Core/GlobalFunctions.h ../src/Eigen/src/Core/Inverse.h ../src/Eigen/src/Core/IO.h ../src/Eigen/src/Core/Map.h ../src/Eigen/src/Core/MapBase.h ../src/Eigen/src/Core/MathFunctions.h ../src/Eigen/src/Core/MathFunctionsImpl.h ../src/Eigen/src/Core/Matrix.h ../src/Eigen/src/Core/MatrixBase.h ../src/Eigen/src/Core/NestByValue.h ../src/Eigen/src/Core/NoAlias.h ../src/Eigen/src/Core/NumTraits.h ../src/Eigen/src/Core/PermutationMatrix.h ../src/Eigen/src/Core/PlainObjectBase.h ../src/Eigen/src/Core/Product.h ../src/Eigen/src/Core/ProductEvaluators.h ../src/Eigen/src/Core/Random.h ../src/Eigen/src/Core/Redux.h ../src/Eigen/src/Core/Ref.h ../src/Eigen/src/Core/Replicate.h ../src/Eigen/src/Core/ReturnByValue.h ../src/Eigen/src/Core/Reverse.h ../src/Eigen/src/Core/Select.h ../src/Eigen/src/Core/SelfAdjointView.h ../src/Eigen/src/Core/SelfCwiseBinaryOp.h ../src/Eigen/src/Core/Solve.h ../src/Eigen/src/Core/SolverBase.h ../src/Eigen/src/Core/SolveTriangular.h ../src/Eigen/src/Core/StableNorm.h ../src/Eigen/src/Core/Stride.h ../src/Eigen/src/Core/Swap.h ../src/Eigen/src/Core/Transpose.h ../src/Eigen/src/Core/Transpositions.h ../src/Eigen/src/Core/TriangularMatrix.h ../src/Eigen/src/Core/VectorBlock.h ../src/Eigen/src/Core/VectorwiseOp.h ../src/Eigen/src/Core/Visitor.h ../src/Eigen/src/Eigenvalues/ComplexEigenSolver.h ../src/Eigen/src/Eigenvalues/ComplexSchur.h ../src/Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h ../src/Eigen/src/Eigenvalues/EigenSolver.h ../src/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h ../src/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h ../src/Eigen/src/Eigenvalues/HessenbergDecomposition.h ../src/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../src/Eigen/src/Eigenvalues/RealQZ.h ../src/Eigen/src/Eigenvalues/RealSchur.h ../src/Eigen/src/Eigenvalues/RealSchur_LAPACKE.h ../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h ../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h ../src/Eigen/src/Eigenvalues/Tridiagonalization.h ../src/Eigen/src/Geometry/arch/Geometry_SSE.h ../src/Eigen/src/Geometry/AlignedBox.h ../src/Eigen/src/Geometry/AngleAxis.h ../src/Eigen/src/Geometry/EulerAngles.h ../src/Eigen/src/Geometry/Homogeneous.h ../src/Eigen/src/Geometry/Hyperplane.h ../src/Eigen/src/Geometry/OrthoMethods.h ../src/Eigen/src/Geometry/ParametrizedLine.h ../src/Eigen/src/Geometry/Quaternion.h ../src/Eigen/src/Geometry/Rotation2D.h ../src/Eigen/src/Geometry/RotationBase.h ../src/Eigen/src/Geometry/Scaling.h ../src/Eigen/src/Geometry/Transform.h ../src/Eigen/src/Geometry/Translation.h ../src/Eigen/src/Geometry/Umeyama.h ../src/Eigen/src/Householder/BlockHouseholder.h ../src/Eigen/src/Householder/Householder.h ../src/Eigen/src/Householder/HouseholderSequence.h ../src/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h ../src/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h ../src/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h ../src/Eigen/src/IterativeLinearSolvers/IncompleteCholesky.h ../src/Eigen/src/IterativeLinearSolvers/IncompleteLUT.h ../src/Eigen/src/IterativeLinearSolvers/IterativeSolverBase.h ../src/Eigen/src/IterativeLinearSolvers/LeastSquareConjugateGradient.h ../src/Eigen/src/IterativeLinearSolvers/SolveWithGuess.h ../src/Eigen/src/Jacobi/Jacobi.h ../src/Eigen/src/LU/arch/Inverse_SSE.h ../src/Eigen/src/LU/Determinant.h ../src/Eigen/src/LU/FullPivLU.h ../src/Eigen/src/LU/InverseImpl.h ../src/Eigen/src/LU/PartialPivLU.h ../src/Eigen/src/LU/PartialPivLU_LAPACKE.h ../src/Eigen/src/MetisSupport/MetisSupport.h ../src/Eigen/src/misc/blas.h ../src/Eigen/src/misc/Image.h ../src/Eigen/src/misc/Kernel.h ../src/Eigen/src/misc/lapack.h ../src/Eigen/src/misc/lapacke.h ../src/Eigen/src/misc/lapacke_mangling.h ../src/Eigen/src/misc/RealSvd2x2.h ../src/Eigen/src/OrderingMethods/Amd.h ../src/Eigen/src/OrderingMethods/Eigen_Colamd.h ../src/Eigen/src/OrderingMethods/Ordering.h ../src/Eigen/src/PardisoSupport/PardisoSupport.h ../src/Eigen/src/PaStiXSupport/PaStiXSupport.h ../src/Eigen/src/plugins/ArrayCwiseBinaryOps.h ../src/Eigen/src/plugins/ArrayCwiseUnaryOps.h ../src/Eigen/src/plugins/BlockMethods.h ../src/Eigen/src/plugins/CommonCwiseBinaryOps.h ../src/Eigen/src/plugins/CommonCwiseUnaryOps.h ../src/Eigen/src/plugins/MatrixCwiseBinaryOps.h ../src/Eigen/src/plugins/MatrixCwiseUnaryOps.h ../src/Eigen/src/QR/ColPivHouseholderQR.h ../src/Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h ../src/Eigen/src/QR/CompleteOrthogonalDecomposition.h ../src/Eigen/src/QR/FullPivHouseholderQR.h ../src/Eigen/src/QR/HouseholderQR.h ../src/Eigen/src/QR/HouseholderQR_LAPACKE.h ../src/Eigen/src/SparseCholesky/SimplicialCholesky.h ../src/Eigen/src/SparseCholesky/SimplicialCholesky_impl.h ../src/Eigen/src/SparseCore/AmbiVector.h ../src/Eigen/src/SparseCore/CompressedStorage.h ../src/Eigen/src/SparseCore/ConservativeSparseSparseProduct.h ../src/Eigen/src/SparseCore/MappedSparseMatrix.h ../src/Eigen/src/SparseCore/SparseAssign.h ../src/Eigen/src/SparseCore/SparseBlock.h ../src/Eigen/src/SparseCore/SparseColEtree.h ../src/Eigen/src/SparseCore/SparseCompressedBase.h ../src/Eigen/src/SparseCore/SparseCwiseBinaryOp.h ../src/Eigen/src/SparseCore/SparseCwiseUnaryOp.h ../src/Eigen/src/SparseCore/SparseDenseProduct.h ../src/Eigen/src/SparseCore/SparseDiagonalProduct.h ../src/Eigen/src/SparseCore/SparseDot.h ../src/Eigen/src/SparseCore/SparseFuzzy.h ../src/Eigen/src/SparseCore/SparseMap.h ../src/Eigen/src/SparseCore/SparseMatrix.h ../src/Eigen/src/SparseCore/SparseMatrixBase.h ../src/Eigen/src/SparseCore/SparsePermutation.h ../src/Eigen/src/SparseCore/SparseProduct.h ../src/Eigen/src/SparseCore/SparseRedux.h ../src/Eigen/src/SparseCore/SparseRef.h ../src/Eigen/src/SparseCore/SparseSelfAdjointView.h ../src/Eigen/src/SparseCore/SparseSolverBase.h ../src/Eigen/src/SparseCore/SparseSparseProductWithPruning.h ../src/Eigen/src/SparseCore/SparseTranspose.h ../src/Eigen/src/SparseCore/SparseTriangularView.h ../src/Eigen/src/SparseCore/SparseUtil.h ../src/Eigen/src/SparseCore/SparseVector.h ../src/Eigen/src/SparseCore/SparseView.h ../src/Eigen/src/SparseCore/TriangularSolver.h ../src/Eigen/src/SparseLU/SparseLU.h ../src/Eigen/src/SparseLU/SparseLU_column_bmod.h ../src/Eigen/src/SparseLU/SparseLU_column_dfs.h ../src/Eigen/src/SparseLU/SparseLU_copy_to_ucol.h ../src/Eigen/src/SparseLU/SparseLU_gemm_kernel.h ../src/Eigen/src/SparseLU/SparseLU_heap_relax_snode.h ../src/Eigen/src/SparseLU/SparseLU_kernel_bmod.h ../src/Eigen/src/SparseLU/SparseLU_Memory.h ../src/Eigen/src/SparseLU/SparseLU_panel_bmod.h ../src/Eigen/src/SparseLU/SparseLU_panel_dfs.h ../src/Eigen/src/SparseLU/SparseLU_pivotL.h ../src/Eigen/src/SparseLU/SparseLU_pruneL.h ../src/Eigen/src/SparseLU/SparseLU_relax_snode.h ../src/Eigen/src/SparseLU/SparseLU_Structs.h ../src/Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h ../src/Eigen/src/SparseLU/SparseLU_Utils.h ../src/Eigen/src/SparseLU/SparseLUImpl.h ../src/Eigen/src/SparseQR/SparseQR.h ../src/Eigen/src/SPQRSupport/SuiteSparseQRSupport.h ../src/Eigen/src/StlSupport/details.h ../src/Eigen/src/StlSupport/StdDeque.h ../src/Eigen/src/StlSupport/StdList.h ../src/Eigen/src/StlSupport/StdVector.h ../src/Eigen/src/SuperLUSupport/SuperLUSupport.h ../src/Eigen/src/SVD/BDCSVD.h ../src/Eigen/src/SVD/JacobiSVD.h ../src/Eigen/src/SVD/JacobiSVD_LAPACKE.h ../src/Eigen/src/SVD/SVDBase.h ../src/Eigen/src/SVD/UpperBidiagonalization.h ../src/Eigen/src/UmfPackSupport/UmfPackSupport.h ../src/util/MathUtils.h ../src/SampleRay.h ../src/renderthread.h ../src/bsdf.h ../src/util/statuslogger.h ../src/util/pathnode.h ../src/bdpt.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../src/main.cpp ../src/pathtracer.cpp ../src/scene/scene.cpp ../src/BVH/BBox.cpp ../src/BVH/BVH.cpp ../src/scene/camera.cpp ../src/scene/basiccamera.cpp ../src/util/CS123XmlSceneParser.cpp ../src/scene/shape/mesh.cpp ../src/scene/shape/triangle.cpp ../src/util/MathUtils.cpp ../src/SampleRay.cpp ../src/renderthread.cpp ../src/bsdf.cpp ../src/util/statuslogger.cpp ../src/bdpt.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents ../src/pathtracer.h ../src/scene/scene.h ../src/BVH/BBox.h ../src/BVH/BVH.h ../src/BVH/IntersectionInfo.h ../src/BVH/Log.h ../src/BVH/Object.h ../src/BVH/Ray.h ../src/BVH/Stopwatch.h ../src/Eigen/Cholesky ../src/Eigen/CholmodSupport ../src/Eigen/Core ../src/Eigen/Dense ../src/Eigen/Eigen ../src/Eigen/Eigenvalues ../src/Eigen/Geometry ../src/Eigen/Householder ../src/Eigen/IterativeLinearSolvers ../src/Eigen/Jacobi ../src/Eigen/LU ../src/Eigen/MetisSupport ../src/Eigen/OrderingMethods ../src/Eigen/PardisoSupport ../src/Eigen/PaStiXSupport ../src/Eigen/QR ../src/Eigen/QtAlignedMalloc ../src/Eigen/Sparse ../src/Eigen/SparseCholesky ../src/Eigen/SparseCore ../src/Eigen/SparseLU ../src/Eigen/SparseQR ../src/Eigen/SPQRSupport ../src/Eigen/StdDeque ../src/Eigen/StdList ../src/Eigen/StdVector ../src/Eigen/SuperLUSupport ../src/Eigen/SVD ../src/Eigen/UmfPackSupport ../src/scene/camera.h ../src/scene/basiccamera.h ../src/util/CS123Common.h ../src/util/CS123ISceneParser.h ../src/util/CS123SceneData.h ../src/util/CS123XmlSceneParser.h ../src/scene/shape/Sphere.h ../src/scene/shape/mesh.h ../src/scene/shape/triangle.h ../src/util/tiny_obj_loader.h ../src/BVH/vector3.h ../src/Eigen/src/Cholesky/LDLT.h ../src/Eigen/src/Cholesky/LLT.h ../src/Eigen/src/Cholesky/LLT_LAPACKE.h ../src/Eigen/src/CholmodSupport/CholmodSupport.h ../src/Eigen/src/Core/arch/AltiVec/Complex.h ../src/Eigen/src/Core/arch/AltiVec/MathFunctions.h ../src/Eigen/src/Core/arch/AltiVec/PacketMath.h ../src/Eigen/src/Core/arch/AVX/Complex.h ../src/Eigen/src/Core/arch/AVX/MathFunctions.h ../src/Eigen/src/Core/arch/AVX/PacketMath.h ../src/Eigen/src/Core/arch/AVX/TypeCasting.h ../src/Eigen/src/Core/arch/AVX512/MathFunctions.h ../src/Eigen/src/Core/arch/AVX512/PacketMath.h ../src/Eigen/src/Core/arch/CUDA/Complex.h ../src/Eigen/src/Core/arch/CUDA/Half.h ../src/Eigen/src/Core/arch/CUDA/MathFunctions.h ../src/Eigen/src/Core/arch/CUDA/PacketMath.h ../src/Eigen/src/Core/arch/CUDA/PacketMathHalf.h ../src/Eigen/src/Core/arch/CUDA/TypeCasting.h ../src/Eigen/src/Core/arch/Default/Settings.h ../src/Eigen/src/Core/arch/NEON/Complex.h ../src/Eigen/src/Core/arch/NEON/MathFunctions.h ../src/Eigen/src/Core/arch/NEON/PacketMath.h ../src/Eigen/src/Core/arch/SSE/Complex.h ../src/Eigen/src/Core/arch/SSE/MathFunctions.h ../src/Eigen/src/Core/arch/SSE/PacketMath.h ../src/Eigen/src/Core/arch/SSE/TypeCasting.h ../src/Eigen/src/Core/arch/ZVector/Complex.h ../src/Eigen/src/Core/arch/ZVector/MathFunctions.h ../src/Eigen/src/Core/arch/ZVector/PacketMath.h ../src/Eigen/src/Core/functors/AssignmentFunctors.h ../src/Eigen/src/Core/functors/BinaryFunctors.h ../src/Eigen/src/Core/functors/NullaryFunctors.h ../src/Eigen/src/Core/functors/StlFunctors.h ../src/Eigen/src/Core/functors/TernaryFunctors.h ../src/Eigen/src/Core/functors/UnaryFunctors.h ../src/Eigen/src/Core/products/GeneralBlockPanelKernel.h ../src/Eigen/src/Core/products/GeneralMatrixMatrix.h ../src/Eigen/src/Core/products/GeneralMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h ../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular_BLAS.h ../src/Eigen/src/Core/products/GeneralMatrixVector.h ../src/Eigen/src/Core/products/GeneralMatrixVector_BLAS.h ../src/Eigen/src/Core/products/Parallelizer.h ../src/Eigen/src/Core/products/SelfadjointMatrixMatrix.h ../src/Eigen/src/Core/products/SelfadjointMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/SelfadjointMatrixVector.h ../src/Eigen/src/Core/products/SelfadjointMatrixVector_BLAS.h ../src/Eigen/src/Core/products/SelfadjointProduct.h ../src/Eigen/src/Core/products/SelfadjointRank2Update.h ../src/Eigen/src/Core/products/TriangularMatrixMatrix.h ../src/Eigen/src/Core/products/TriangularMatrixMatrix_BLAS.h ../src/Eigen/src/Core/products/TriangularMatrixVector.h ../src/Eigen/src/Core/products/TriangularMatrixVector_BLAS.h ../src/Eigen/src/Core/products/TriangularSolverMatrix.h ../src/Eigen/src/Core/products/TriangularSolverMatrix_BLAS.h ../src/Eigen/src/Core/products/TriangularSolverVector.h ../src/Eigen/src/Core/util/BlasUtil.h ../src/Eigen/src/Core/util/Constants.h ../src/Eigen/src/Core/util/DisableStupidWarnings.h ../src/Eigen/src/Core/util/ForwardDeclarations.h ../src/Eigen/src/Core/util/Macros.h ../src/Eigen/src/Core/util/Memory.h ../src/Eigen/src/Core/util/Meta.h ../src/Eigen/src/Core/util/MKL_support.h ../src/Eigen/src/Core/util/NonMPL2.h ../src/Eigen/src/Core/util/ReenableStupidWarnings.h ../src/Eigen/src/Core/util/StaticAssert.h ../src/Eigen/src/Core/util/XprHelper.h ../src/Eigen/src/Core/Array.h ../src/Eigen/src/Core/ArrayBase.h ../src/Eigen/src/Core/ArrayWrapper.h ../src/Eigen/src/Core/Assign.h ../src/Eigen/src/Core/Assign_MKL.h ../src/Eigen/src/Core/AssignEvaluator.h ../src/Eigen/src/Core/BandMatrix.h ../src/Eigen/src/Core/Block.h ../src/Eigen/src/Core/BooleanRedux.h ../src/Eigen/src/Core/CommaInitializer.h ../src/Eigen/src/Core/ConditionEstimator.h ../src/Eigen/src/Core/CoreEvaluators.h ../src/Eigen/src/Core/CoreIterators.h ../src/Eigen/src/Core/CwiseBinaryOp.h ../src/Eigen/src/Core/CwiseNullaryOp.h ../src/Eigen/src/Core/CwiseTernaryOp.h ../src/Eigen/src/Core/CwiseUnaryOp.h ../src/Eigen/src/Core/CwiseUnaryView.h ../src/Eigen/src/Core/DenseBase.h ../src/Eigen/src/Core/DenseCoeffsBase.h ../src/Eigen/src/Core/DenseStorage.h ../src/Eigen/src/Core/Diagonal.h ../src/Eigen/src/Core/DiagonalMatrix.h ../src/Eigen/src/Core/DiagonalProduct.h ../src/Eigen/src/Core/Dot.h ../src/Eigen/src/Core/EigenBase.h ../src/Eigen/src/Core/ForceAlignedAccess.h ../src/Eigen/src/Core/Fuzzy.h ../src/Eigen/src/Core/GeneralProduct.h ../src/Eigen/src/Core/GenericPacketMath.h ../src/Eigen/src/Core/GlobalFunctions.h ../src/Eigen/src/Core/Inverse.h ../src/Eigen/src/Core/IO.h ../src/Eigen/src/Core/Map.h ../src/Eigen/src/Core/MapBase.h ../src/Eigen/src/Core/MathFunctions.h ../src/Eigen/src/Core/MathFunctionsImpl.h ../src/Eigen/src/Core/Matrix.h ../src/Eigen/src/Core/MatrixBase.h ../src/Eigen/src/Core/NestByValue.h ../src/Eigen/src/Core/NoAlias.h ../src/Eigen/src/Core/NumTraits.h ../src/Eigen/src/Core/PermutationMatrix.h ../src/Eigen/src/Core/PlainObjectBase.h ../src/Eigen/src/Core/Product.h ../src/Eigen/src/Core/ProductEvaluators.h ../src/Eigen/src/Core/Random.h ../src/Eigen/src/Core/Redux.h ../src/Eigen/src/Core/Ref.h ../src/Eigen/src/Core/Replicate.h ../src/Eigen/src/Core/ReturnByValue.h ../src/Eigen/src/Core/Reverse.h ../src/Eigen/src/Core/Select.h ../src/Eigen/src/Core/SelfAdjointView.h ../src/Eigen/src/Core/SelfCwiseBinaryOp.h ../src/Eigen/src/Core/Solve.h ../src/Eigen/src/Core/SolverBase.h ../src/Eigen/src/Core/SolveTriangular.h ../src/Eigen/src/Core/StableNorm.h ../src/Eigen/src/Core/Stride.h ../src/Eigen/src/Core/Swap.h ../src/Eigen/src/Core/Transpose.h ../src/Eigen/src/Core/Transpositions.h ../src/Eigen/src/Core/TriangularMatrix.h ../src/Eigen/src/Core/VectorBlock.h ../src/Eigen/src/Core/VectorwiseOp.h ../src/Eigen/src/Core/Visitor.h ../src/Eigen/src/Eigenvalues/ComplexEigenSolver.h ../src/Eigen/src/Eigenvalues/ComplexSchur.h ../src/Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h ../src/Eigen/src/Eigenvalues/EigenSolver.h ../src/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h ../src/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h ../src/Eigen/src/Eigenvalues/HessenbergDecomposition.h ../src/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h ../src/Eigen/src/Eigenvalues/RealQZ.h ../src/Eigen/src/Eigenvalues/RealSchur.h ../src/Eigen/src/Eigenvalues/RealSchur_LAPACKE.h ../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h ../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h ../src/Eigen/src/Eigenvalues/Tridiagonalization.h ../src/Eigen/src/Geometry/arch/Geometry_SSE.h ../src/Eigen/src/Geometry/AlignedBox.h ../src/Eigen/src/Geometry/AngleAxis.h ../src/Eigen/src/Geometry/EulerAngles.h ../src/Eigen/src/Geometry/Homogeneous.h ../src/Eigen/src/Geometry/Hyperplane.h ../src/Eigen/src/Geometry/OrthoMethods.h ../src/Eigen/src/Geometry/ParametrizedLine.h ../src/Eigen/src/Geometry/Quaternion.h ../src/Eigen/src/Geometry/Rotation2D.h ../src/Eigen/src/Geometry/RotationBase.h ../src/Eigen/src/Geometry/Scaling.h ../src/Eigen/src/Geometry/Transform.h ../src/Eigen/src/Geometry/Translation.h ../src/Eigen/src/Geometry/Umeyama.h ../src/Eigen/src/Householder/BlockHouseholder.h ../src/Eigen/src/Householder/Householder.h ../src/Eigen/src/Householder/HouseholderSequence.h ../src/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h ../src/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h ../src/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h ../src/Eigen/src/IterativeLinearSolvers/IncompleteCholesky.h ../src/Eigen/src/IterativeLinearSolvers/IncompleteLUT.h ../src/Eigen/src/IterativeLinearSolvers/IterativeSolverBase.h ../src/Eigen/src/IterativeLinearSolvers/LeastSquareConjugateGradient.h ../src/Eigen/src/IterativeLinearSolvers/SolveWithGuess.h ../src/Eigen/src/Jacobi/Jacobi.h ../src/Eigen/src/LU/arch/Inverse_SSE.h ../src/Eigen/src/LU/Determinant.h ../src/Eigen/src/LU/FullPivLU.h ../src/Eigen/src/LU/InverseImpl.h ../src/Eigen/src/LU/PartialPivLU.h ../src/Eigen/src/LU/PartialPivLU_LAPACKE.h ../src/Eigen/src/MetisSupport/MetisSupport.h ../src/Eigen/src/misc/blas.h ../src/Eigen/src/misc/Image.h ../src/Eigen/src/misc/Kernel.h ../src/Eigen/src/misc/lapack.h ../src/Eigen/src/misc/lapacke.h ../src/Eigen/src/misc/lapacke_mangling.h ../src/Eigen/src/misc/RealSvd2x2.h ../src/Eigen/src/OrderingMethods/Amd.h ../src/Eigen/src/OrderingMethods/Eigen_Colamd.h ../src/Eigen/src/OrderingMethods/Ordering.h ../src/Eigen/src/PardisoSupport/PardisoSupport.h ../src/Eigen/src/PaStiXSupport/PaStiXSupport.h ../src/Eigen/src/plugins/ArrayCwiseBinaryOps.h ../src/Eigen/src/plugins/ArrayCwiseUnaryOps.h ../src/Eigen/src/plugins/BlockMethods.h ../src/Eigen/src/plugins/CommonCwiseBinaryOps.h ../src/Eigen/src/plugins/CommonCwiseUnaryOps.h ../src/Eigen/src/plugins/MatrixCwiseBinaryOps.h ../src/Eigen/src/plugins/MatrixCwiseUnaryOps.h ../src/Eigen/src/QR/ColPivHouseholderQR.h ../src/Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h ../src/Eigen/src/QR/CompleteOrthogonalDecomposition.h ../src/Eigen/src/QR/FullPivHouseholderQR.h ../src/Eigen/src/QR/HouseholderQR.h ../src/Eigen/src/QR/HouseholderQR_LAPACKE.h ../src/Eigen/src/SparseCholesky/SimplicialCholesky.h ../src/Eigen/src/SparseCholesky/SimplicialCholesky_impl.h ../src/Eigen/src/SparseCore/AmbiVector.h ../src/Eigen/src/SparseCore/CompressedStorage.h ../src/Eigen/src/SparseCore/ConservativeSparseSparseProduct.h ../src/Eigen/src/SparseCore/MappedSparseMatrix.h ../src/Eigen/src/SparseCore/SparseAssign.h ../src/Eigen/src/SparseCore/SparseBlock.h ../src/Eigen/src/SparseCore/SparseColEtree.h ../src/Eigen/src/SparseCore/SparseCompressedBase.h ../src/Eigen/src/SparseCore/SparseCwiseBinaryOp.h ../src/Eigen/src/SparseCore/SparseCwiseUnaryOp.h ../src/Eigen/src/SparseCore/SparseDenseProduct.h ../src/Eigen/src/SparseCore/SparseDiagonalProduct.h ../src/Eigen/src/SparseCore/SparseDot.h ../src/Eigen/src/SparseCore/SparseFuzzy.h ../src/Eigen/src/SparseCore/SparseMap.h ../src/Eigen/src/SparseCore/SparseMatrix.h ../src/Eigen/src/SparseCore/SparseMatrixBase.h ../src/Eigen/src/SparseCore/SparsePermutation.h ../src/Eigen/src/SparseCore/SparseProduct.h ../src/Eigen/src/SparseCore/SparseRedux.h ../src/Eigen/src/SparseCore/SparseRef.h ../src/Eigen/src/SparseCore/SparseSelfAdjointView.h ../src/Eigen/src/SparseCore/SparseSolverBase.h ../src/Eigen/src/SparseCore/SparseSparseProductWithPruning.h ../src/Eigen/src/SparseCore/SparseTranspose.h ../src/Eigen/src/SparseCore/SparseTriangularView.h ../src/Eigen/src/SparseCore/SparseUtil.h ../src/Eigen/src/SparseCore/SparseVector.h ../src/Eigen/src/SparseCore/SparseView.h ../src/Eigen/src/SparseCore/TriangularSolver.h ../src/Eigen/src/SparseLU/SparseLU.h ../src/Eigen/src/SparseLU/SparseLU_column_bmod.h ../src/Eigen/src/SparseLU/SparseLU_column_dfs.h ../src/Eigen/src/SparseLU/SparseLU_copy_to_ucol.h ../src/Eigen/src/SparseLU/SparseLU_gemm_kernel.h ../src/Eigen/src/SparseLU/SparseLU_heap_relax_snode.h ../src/Eigen/src/SparseLU/SparseLU_kernel_bmod.h ../src/Eigen/src/SparseLU/SparseLU_Memory.h ../src/Eigen/src/SparseLU/SparseLU_panel_bmod.h ../src/Eigen/src/SparseLU/SparseLU_panel_dfs.h ../src/Eigen/src/SparseLU/SparseLU_pivotL.h ../src/Eigen/src/SparseLU/SparseLU_pruneL.h ../src/Eigen/src/SparseLU/SparseLU_relax_snode.h ../src/Eigen/src/SparseLU/SparseLU_Structs.h ../src/Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h ../src/Eigen/src/SparseLU/SparseLU_Utils.h ../src/Eigen/src/SparseLU/SparseLUImpl.h ../src/Eigen/src/SparseQR/SparseQR.h ../src/Eigen/src/SPQRSupport/SuiteSparseQRSupport.h ../src/Eigen/src/StlSupport/details.h ../src/Eigen/src/StlSupport/StdDeque.h ../src/Eigen/src/StlSupport/StdList.h ../src/Eigen/src/StlSupport/StdVector.h ../src/Eigen/src/SuperLUSupport/SuperLUSupport.h ../src/Eigen/src/SVD/BDCSVD.h ../src/Eigen/src/SVD/JacobiSVD.h ../src/Eigen/src/SVD/JacobiSVD_LAPACKE.h ../src/Eigen/src/SVD/SVDBase.h ../src/Eigen/src/SVD/UpperBidiagonalization.h ../src/Eigen/src/UmfPackSupport/UmfPackSupport.h ../src/util/MathUtils.h ../src/SampleRay.h ../src/renderthread.h ../src/bsdf.h ../src/util/statuslogger.h ../src/util/pathnode.h ../src/bdpt.h ../src/bdpt2.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../src/main.cpp ../src/pathtracer.cpp ../src/scene/scene.cpp ../src/BVH/BBox.cpp ../src/BVH/BVH.cpp ../src/scene/camera.cpp ../src/scene/basiccamera.cpp ../src/util/CS123XmlSceneParser.cpp ../src/scene/shape/mesh.cpp ../src/scene/shape/triangle.cpp ../src/util/MathUtils.cpp ../src/SampleRay.cpp ../src/renderthread.cpp ../src/bsdf.cpp ../src/util/statuslogger.cpp ../src/bdpt.cpp ../src/bdpt2.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -935,6 +942,7 @@ clean: compiler_clean
 
 distclean: clean 
 	-$(DEL_FILE) $(TARGET) 
+	-$(DEL_FILE) .qmake.stash
 	-$(DEL_FILE) Makefile
 
 
@@ -1444,7 +1452,8 @@ pathtracer.o: ../src/pathtracer.cpp ../src/pathtracer.h \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qmutex.h \
 		../src/bdpt.h \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QThreadPool \
-		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qthreadpool.h
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qthreadpool.h \
+		../src/bdpt2.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o pathtracer.o ../src/pathtracer.cpp
 
 scene.o: ../src/scene/scene.cpp ../src/scene/scene.h \
@@ -4316,6 +4325,235 @@ bdpt.o: ../src/bdpt.cpp ../src/bdpt.h \
 		../src/Eigen/src/StlSupport/StdVector.h \
 		../src/Eigen/src/StlSupport/details.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o bdpt.o ../src/bdpt.cpp
+
+bdpt2.o: ../src/bdpt2.cpp ../src/bdpt2.h \
+		../src/Eigen/Dense \
+		../src/Eigen/Core \
+		../src/Eigen/src/Core/util/DisableStupidWarnings.h \
+		../src/Eigen/src/Core/util/Macros.h \
+		../src/Eigen/src/Core/util/MKL_support.h \
+		../src/Eigen/src/misc/blas.h \
+		../src/Eigen/src/Core/util/Constants.h \
+		../src/Eigen/src/Core/util/Meta.h \
+		../src/Eigen/src/Core/util/ForwardDeclarations.h \
+		../src/Eigen/src/Core/util/StaticAssert.h \
+		../src/Eigen/src/Core/util/XprHelper.h \
+		../src/Eigen/src/Core/util/Memory.h \
+		../src/Eigen/src/Core/NumTraits.h \
+		../src/Eigen/src/Core/MathFunctions.h \
+		../src/Eigen/src/Core/GenericPacketMath.h \
+		../src/Eigen/src/Core/MathFunctionsImpl.h \
+		../src/Eigen/src/Core/arch/SSE/PacketMath.h \
+		../src/Eigen/src/Core/arch/AVX/PacketMath.h \
+		../src/Eigen/src/Core/arch/AVX512/PacketMath.h \
+		../src/Eigen/src/Core/arch/AVX512/MathFunctions.h \
+		../src/Eigen/src/Core/arch/SSE/Complex.h \
+		../src/Eigen/src/Core/arch/SSE/MathFunctions.h \
+		../src/Eigen/src/Core/arch/AVX/MathFunctions.h \
+		../src/Eigen/src/Core/arch/AVX/Complex.h \
+		../src/Eigen/src/Core/arch/AVX/TypeCasting.h \
+		../src/Eigen/src/Core/arch/SSE/TypeCasting.h \
+		../src/Eigen/src/Core/arch/AltiVec/PacketMath.h \
+		../src/Eigen/src/Core/arch/AltiVec/MathFunctions.h \
+		../src/Eigen/src/Core/arch/AltiVec/Complex.h \
+		../src/Eigen/src/Core/arch/NEON/PacketMath.h \
+		../src/Eigen/src/Core/arch/NEON/MathFunctions.h \
+		../src/Eigen/src/Core/arch/NEON/Complex.h \
+		../src/Eigen/src/Core/arch/ZVector/PacketMath.h \
+		../src/Eigen/src/Core/arch/ZVector/MathFunctions.h \
+		../src/Eigen/src/Core/arch/ZVector/Complex.h \
+		../src/Eigen/src/Core/arch/CUDA/Half.h \
+		../src/Eigen/src/Core/arch/CUDA/PacketMathHalf.h \
+		../src/Eigen/src/Core/arch/CUDA/TypeCasting.h \
+		../src/Eigen/src/Core/arch/CUDA/PacketMath.h \
+		../src/Eigen/src/Core/arch/CUDA/MathFunctions.h \
+		../src/Eigen/src/Core/arch/Default/Settings.h \
+		../src/Eigen/src/Core/functors/TernaryFunctors.h \
+		../src/Eigen/src/Core/functors/BinaryFunctors.h \
+		../src/Eigen/src/Core/functors/UnaryFunctors.h \
+		../src/Eigen/src/Core/functors/NullaryFunctors.h \
+		../src/Eigen/src/Core/functors/StlFunctors.h \
+		../src/Eigen/src/Core/functors/AssignmentFunctors.h \
+		../src/Eigen/src/Core/arch/CUDA/Complex.h \
+		../src/Eigen/src/Core/IO.h \
+		../src/Eigen/src/Core/DenseCoeffsBase.h \
+		../src/Eigen/src/Core/DenseBase.h \
+		../src/Eigen/src/plugins/BlockMethods.h \
+		../src/Eigen/src/Core/MatrixBase.h \
+		../src/Eigen/src/plugins/CommonCwiseUnaryOps.h \
+		../src/Eigen/src/plugins/CommonCwiseBinaryOps.h \
+		../src/Eigen/src/plugins/MatrixCwiseUnaryOps.h \
+		../src/Eigen/src/plugins/MatrixCwiseBinaryOps.h \
+		../src/Eigen/src/Core/EigenBase.h \
+		../src/Eigen/src/Core/Product.h \
+		../src/Eigen/src/Core/CoreEvaluators.h \
+		../src/Eigen/src/Core/AssignEvaluator.h \
+		../src/Eigen/src/Core/Assign.h \
+		../src/Eigen/src/Core/ArrayBase.h \
+		../src/Eigen/src/plugins/ArrayCwiseUnaryOps.h \
+		../src/Eigen/src/plugins/ArrayCwiseBinaryOps.h \
+		../src/Eigen/src/Core/util/BlasUtil.h \
+		../src/Eigen/src/Core/DenseStorage.h \
+		../src/Eigen/src/Core/NestByValue.h \
+		../src/Eigen/src/Core/ReturnByValue.h \
+		../src/Eigen/src/Core/NoAlias.h \
+		../src/Eigen/src/Core/PlainObjectBase.h \
+		../src/Eigen/src/Core/Matrix.h \
+		../src/Eigen/src/Core/Array.h \
+		../src/Eigen/src/Core/CwiseTernaryOp.h \
+		../src/Eigen/src/Core/CwiseBinaryOp.h \
+		../src/Eigen/src/Core/CwiseUnaryOp.h \
+		../src/Eigen/src/Core/CwiseNullaryOp.h \
+		../src/Eigen/src/Core/CwiseUnaryView.h \
+		../src/Eigen/src/Core/SelfCwiseBinaryOp.h \
+		../src/Eigen/src/Core/Dot.h \
+		../src/Eigen/src/Core/StableNorm.h \
+		../src/Eigen/src/Core/Stride.h \
+		../src/Eigen/src/Core/MapBase.h \
+		../src/Eigen/src/Core/Map.h \
+		../src/Eigen/src/Core/Ref.h \
+		../src/Eigen/src/Core/Block.h \
+		../src/Eigen/src/Core/VectorBlock.h \
+		../src/Eigen/src/Core/Transpose.h \
+		../src/Eigen/src/Core/DiagonalMatrix.h \
+		../src/Eigen/src/Core/Diagonal.h \
+		../src/Eigen/src/Core/DiagonalProduct.h \
+		../src/Eigen/src/Core/Redux.h \
+		../src/Eigen/src/Core/Visitor.h \
+		../src/Eigen/src/Core/Fuzzy.h \
+		../src/Eigen/src/Core/Swap.h \
+		../src/Eigen/src/Core/CommaInitializer.h \
+		../src/Eigen/src/Core/GeneralProduct.h \
+		../src/Eigen/src/Core/Solve.h \
+		../src/Eigen/src/Core/Inverse.h \
+		../src/Eigen/src/Core/SolverBase.h \
+		../src/Eigen/src/Core/PermutationMatrix.h \
+		../src/Eigen/src/Core/Transpositions.h \
+		../src/Eigen/src/Core/TriangularMatrix.h \
+		../src/Eigen/src/Core/SelfAdjointView.h \
+		../src/Eigen/src/Core/products/GeneralBlockPanelKernel.h \
+		../src/Eigen/src/Core/products/Parallelizer.h \
+		../src/Eigen/src/Core/ProductEvaluators.h \
+		../src/Eigen/src/Core/products/GeneralMatrixVector.h \
+		../src/Eigen/src/Core/products/GeneralMatrixMatrix.h \
+		../src/Eigen/src/Core/SolveTriangular.h \
+		../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h \
+		../src/Eigen/src/Core/products/SelfadjointMatrixVector.h \
+		../src/Eigen/src/Core/products/SelfadjointMatrixMatrix.h \
+		../src/Eigen/src/Core/products/SelfadjointProduct.h \
+		../src/Eigen/src/Core/products/SelfadjointRank2Update.h \
+		../src/Eigen/src/Core/products/TriangularMatrixVector.h \
+		../src/Eigen/src/Core/products/TriangularMatrixMatrix.h \
+		../src/Eigen/src/Core/products/TriangularSolverMatrix.h \
+		../src/Eigen/src/Core/products/TriangularSolverVector.h \
+		../src/Eigen/src/Core/BandMatrix.h \
+		../src/Eigen/src/Core/CoreIterators.h \
+		../src/Eigen/src/Core/ConditionEstimator.h \
+		../src/Eigen/src/Core/BooleanRedux.h \
+		../src/Eigen/src/Core/Select.h \
+		../src/Eigen/src/Core/VectorwiseOp.h \
+		../src/Eigen/src/Core/Random.h \
+		../src/Eigen/src/Core/Replicate.h \
+		../src/Eigen/src/Core/Reverse.h \
+		../src/Eigen/src/Core/ArrayWrapper.h \
+		../src/Eigen/src/Core/products/GeneralMatrixMatrix_BLAS.h \
+		../src/Eigen/src/Core/products/GeneralMatrixVector_BLAS.h \
+		../src/Eigen/src/Core/products/GeneralMatrixMatrixTriangular_BLAS.h \
+		../src/Eigen/src/Core/products/SelfadjointMatrixMatrix_BLAS.h \
+		../src/Eigen/src/Core/products/SelfadjointMatrixVector_BLAS.h \
+		../src/Eigen/src/Core/products/TriangularMatrixMatrix_BLAS.h \
+		../src/Eigen/src/Core/products/TriangularMatrixVector_BLAS.h \
+		../src/Eigen/src/Core/products/TriangularSolverMatrix_BLAS.h \
+		../src/Eigen/src/Core/Assign_MKL.h \
+		../src/Eigen/src/Core/GlobalFunctions.h \
+		../src/Eigen/src/Core/util/ReenableStupidWarnings.h \
+		../src/Eigen/LU \
+		../src/Eigen/src/misc/Kernel.h \
+		../src/Eigen/src/misc/Image.h \
+		../src/Eigen/src/LU/FullPivLU.h \
+		../src/Eigen/src/LU/PartialPivLU.h \
+		../src/Eigen/src/misc/lapacke.h \
+		../src/Eigen/src/misc/lapacke_mangling.h \
+		../src/Eigen/src/LU/PartialPivLU_LAPACKE.h \
+		../src/Eigen/src/LU/Determinant.h \
+		../src/Eigen/src/LU/InverseImpl.h \
+		../src/Eigen/src/LU/arch/Inverse_SSE.h \
+		../src/Eigen/Cholesky \
+		../src/Eigen/src/Cholesky/LLT.h \
+		../src/Eigen/src/Cholesky/LDLT.h \
+		../src/Eigen/src/Cholesky/LLT_LAPACKE.h \
+		../src/Eigen/QR \
+		../src/Eigen/Jacobi \
+		../src/Eigen/src/Jacobi/Jacobi.h \
+		../src/Eigen/Householder \
+		../src/Eigen/src/Householder/Householder.h \
+		../src/Eigen/src/Householder/HouseholderSequence.h \
+		../src/Eigen/src/Householder/BlockHouseholder.h \
+		../src/Eigen/src/QR/HouseholderQR.h \
+		../src/Eigen/src/QR/FullPivHouseholderQR.h \
+		../src/Eigen/src/QR/ColPivHouseholderQR.h \
+		../src/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
+		../src/Eigen/src/QR/HouseholderQR_LAPACKE.h \
+		../src/Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h \
+		../src/Eigen/SVD \
+		../src/Eigen/src/misc/RealSvd2x2.h \
+		../src/Eigen/src/SVD/UpperBidiagonalization.h \
+		../src/Eigen/src/SVD/SVDBase.h \
+		../src/Eigen/src/SVD/JacobiSVD.h \
+		../src/Eigen/src/SVD/BDCSVD.h \
+		../src/Eigen/src/SVD/JacobiSVD_LAPACKE.h \
+		../src/Eigen/Geometry \
+		../src/Eigen/src/Geometry/OrthoMethods.h \
+		../src/Eigen/src/Geometry/EulerAngles.h \
+		../src/Eigen/src/Geometry/Homogeneous.h \
+		../src/Eigen/src/Geometry/RotationBase.h \
+		../src/Eigen/src/Geometry/Rotation2D.h \
+		../src/Eigen/src/Geometry/Quaternion.h \
+		../src/Eigen/src/Geometry/AngleAxis.h \
+		../src/Eigen/src/Geometry/Transform.h \
+		../src/Eigen/src/Geometry/Translation.h \
+		../src/Eigen/src/Geometry/Scaling.h \
+		../src/Eigen/src/Geometry/Hyperplane.h \
+		../src/Eigen/src/Geometry/ParametrizedLine.h \
+		../src/Eigen/src/Geometry/AlignedBox.h \
+		../src/Eigen/src/Geometry/Umeyama.h \
+		../src/Eigen/src/Geometry/arch/Geometry_SSE.h \
+		../src/Eigen/Eigenvalues \
+		../src/Eigen/src/Eigenvalues/Tridiagonalization.h \
+		../src/Eigen/src/Eigenvalues/RealSchur.h \
+		../src/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+		../src/Eigen/src/Eigenvalues/EigenSolver.h \
+		../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
+		../src/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
+		../src/Eigen/src/Eigenvalues/ComplexSchur.h \
+		../src/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
+		../src/Eigen/src/Eigenvalues/RealQZ.h \
+		../src/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
+		../src/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
+		../src/Eigen/src/Eigenvalues/RealSchur_LAPACKE.h \
+		../src/Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h \
+		../src/Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h \
+		../src/util/pathnode.h \
+		../src/BVH/Ray.h \
+		../src/util/CS123Common.h \
+		../src/bsdf.h \
+		../src/util/tiny_obj_loader.h \
+		../src/scene/scene.h \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QString \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qstring.h \
+		../src/BVH/BVH.h \
+		../src/BVH/BBox.h \
+		../src/BVH/Object.h \
+		../src/BVH/IntersectionInfo.h \
+		../src/util/CS123SceneData.h \
+		../src/scene/basiccamera.h \
+		../src/scene/camera.h \
+		../src/scene/shape/mesh.h \
+		../src/scene/shape/triangle.h \
+		../src/Eigen/StdVector \
+		../src/Eigen/src/StlSupport/StdVector.h \
+		../src/Eigen/src/StlSupport/details.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o bdpt2.o ../src/bdpt2.cpp
 
 ####### Install
 
