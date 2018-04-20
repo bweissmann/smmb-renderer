@@ -186,7 +186,7 @@ Vector3f BDPT2::computeStuff(const Scene &scene, const std::vector<PathNode> &ey
     const float cos_theta_prime = fmax(light.surface_normal.dot(-direction_to_light), 0);
 
 
-    const Vector3f direct_brdf = BSDF::getBsdfFromType(eye_path[eye_path.size() - 1].outgoing_ray, direction_to_light,
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(eye_path[eye_path.size() - 2].outgoing_ray, direction_to_light,
             last_eye.surface_normal, last_eye.mat, last_eye.type);
 
     Vector3f light_emission = light.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light.point_prob);

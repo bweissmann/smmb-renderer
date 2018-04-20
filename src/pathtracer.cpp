@@ -282,48 +282,16 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
 
         if (eye_path.size() == 1) {
             continue;
+            total++;
         }
 
-        Vector3f sample = BDPT2::computeStuff(scene, eye_path, light_path);
-        if (sample.norm() == 0) {
-            continue;
-        }
-        total++;
-        output_radience += sample;
-
-        //get rid of emissive term at end of the light path
-//        int size = light_path.size();
-//        if (size > 1 && light_path[size - 1].type == LIGHT) {
-//            light_path.pop_back();
-//        }
-
-//        if (size < 2) {
-//            continue;
-//        }
-
-//        size = eye_path.size();
-//        if (size > 1 && eye_path[size - 1].type == LIGHT) {
-//            eye_path.pop_back();
-//        }
-
-//        if (size < 3) {
-//            continue;
-//        }
-
-//        Vector3f sample = BDPT2::computeRadiance(scene, eye_path, light_path);
-//        output_radience += sample;
-//        total++;
-
-        //samples the combined path
-//        BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
-//        output_radience += samples.contrib;
-//        total += samples.num_samples;
-//        Sample samples = BDPT2::combinePaths(scene, eye_path, light_path);
-//        output_radience += samples.radiance; //contribution total
-//        total += samples.number_samples; //total number of sampled path
-
+        BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
+        output_radience += samples.contrib;
+        total += samples.num_samples;
       }
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
+//    intensityValues[output_index] = output_radience / total;
+
 }
 
 
@@ -342,11 +310,8 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0) {
             Vector3f N = ray.is_in_air ? normal : -normal;
-
-//            if (N.dot(ray.d) < 0) { //coming towards it
                 PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
                 pathNodes.push_back(node);
-//            }
             return;
         }
 
