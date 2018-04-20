@@ -323,7 +323,7 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
 //        total += samples.number_samples; //total number of sampled path
 
       }
-    intensityValues[output_index] = output_radience / total;
+    intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
 }
 
 
