@@ -127,13 +127,13 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         }
 
         // Direct Light Contribution
-//        int num_direct_light = 10;
-//        for (int j = 0; j < num_direct_light; j++) {
-//            SampledLightInfo light_info = scene.sampleLight();
-//            if (lightIsVisible(light_info.position, i.hit, scene)) {
-//                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
-//            }
-//        }
+        int num_direct_light = 1;
+        for (int j = 0; j < num_direct_light; j++) {
+            SampledLightInfo light_info = scene.sampleLight();
+            if (lightIsVisible(light_info.position, i.hit, scene)) {
+                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+            }
+        }
 
         const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
 
@@ -141,7 +141,6 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
 
         float pdf_rr = getContinueProbability(brdf);
-//        if (depth < 3) pdf_rr = 1.f; // TEMP LONG PATHS
         if (MathUtils::random() < pdf_rr) {
             // Deal with refraction separately
             if (type == REFRACTION) {
@@ -157,14 +156,6 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
             const Vector3f reflected_light = traceRay(next_ray, scene, next_depth).cwiseProduct(brdf) * N.dot(next_ray.d)
                     / (next_ray_info.prob * pdf_rr * schlick);
             total_light += reflected_light;
-        } else {
-            int num_direct_light = 1;
-            for (int j = 0; j < num_direct_light; j++) {
-                SampledLightInfo light_info = scene.sampleLight();
-                if (lightIsVisible(light_info.position, i.hit, scene)) {
-                    total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
-                }
-            }
         }
     }
 
@@ -310,8 +301,8 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0) {
             Vector3f N = ray.is_in_air ? normal : -normal;
-                PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
-                pathNodes.push_back(node);
+            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
+            pathNodes.push_back(node);
             return;
         }
 
@@ -329,7 +320,7 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             tracePath(next_ray, scene, depth + 1, pathNodes);
         } else {
             Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, ((1 - pdf_rr) * next_ray_info.prob), 0);
+            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, (1 - pdf_rr), 0);
             pathNodes.push_back(node);
         }
     }
