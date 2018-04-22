@@ -261,7 +261,7 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
         SampledLightInfo light_info = scene.sampleLight();
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
         SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
-        PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(0, 0, 0),
+        PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(1, 1, 1),
                                        light_info.emission, ray_info.ray, LIGHT, ray_info.prob, light_info.prob);
 
 
@@ -276,10 +276,25 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
             total++;
         }
 
+        //need to remove because path might end on light
+        int size = light_path.size();
+        if (size > 1 && light_path[size - 1].type == LIGHT) {
+            light_path.pop_back();
+        }
+
+
         BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
         output_radience += samples.contrib;
         total += samples.num_samples;
       }
+      std::cout << "rad : " << output_radience.norm() << std::endl;
+      std::cout << "samples " << total << std::endl;
+      std::cout << "" << std::endl;
+
+//    std::cout << "total: " << total << std::endl;
+//    std::cout << "num samples: " << M_NUM_SAMPLES << std::endl;
+//    std::cout << "" << std::endl;
+
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
 //    intensityValues[output_index] = output_radience / total;
 
@@ -310,9 +325,8 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
         const Ray next_ray = next_ray_info.ray;
         const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
-        const float pdf_rr = getContinueProbability(brdf);
+        float pdf_rr = getContinueProbability(brdf);
 
-        //test up to depth 1
         if (MathUtils::random() < pdf_rr) {
             Vector3f N = ray.is_in_air ? normal : -normal;
             PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, pdf_rr * next_ray_info.prob, 0);

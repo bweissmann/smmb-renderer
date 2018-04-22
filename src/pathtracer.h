@@ -26,7 +26,7 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 100;
+    const int M_NUM_SAMPLES = 200;
 
     /* Helpers for parallelism and logging */
     const int PARALLEL_RANGE = 50;

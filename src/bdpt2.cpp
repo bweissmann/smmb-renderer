@@ -155,17 +155,29 @@ Vector3f BDPT2::computeStuff(const Scene &scene, const std::vector<PathNode> &ey
     PathNode last_eye = eye_path[eye_path.size() - 1];
     PathNode light = light_path[0];
     int stop = eye_path.size() - 1;
+
     if (last_eye.type == LIGHT) {
-//        if (stop == 1) {
-//            return Vector3f(0, 0, 0);
-//        }
+        if (stop == 1) {
+            std::cout << "here" << std::endl;
+            return last_eye.emission;
+        }
+        light = last_eye;
+        last_eye = eye_path[stop - 1];
+        stop = stop - 1;
 //        last_eye = eye_path[stop - 1];
 //        light = eye_path[stop];
 //        stop = stop - 1;
 //        if (stop == 1) {
-//            return light.emission;
+//            return l
 //        }
-        return Vector3f(0, 0, 0);
+//        return Vector3f(0, 0, 0);
+//        if (stop == 1) {
+//            return last_eye.emission;
+//        } else {
+//            last_eye = eye_path[stop - 1];
+//            light = eye_path[stop];
+//            stop = stop - 1;
+//        }
     }
 
     for (int i = 1; i < stop; i++) {
