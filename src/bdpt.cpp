@@ -11,21 +11,23 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
     BDPT_Samples samples = BDPT_Samples();
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
-    //ignoring the case when the we connect light path directly to eye node
     samples.num_samples = num_light_nodes;
     for (int i = 1; i < num_eye_nodes; i++) {
+//        if (i != 1) { continue; }
+
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
         } else if (eye_path[i].type == LIGHT) {
-            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0);
+            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0) / (i);
 //            samples.num_samples++;
             continue;
          }
         for (int j = 0; j < num_light_nodes; j++) {
-            if (j != 3) continue; // TEMP BEN DID THIS SORRY
+//            if (j != 1) { continue; }
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
-                samples.contrib += contrib;
+                int divide = i + j - 1 == 0 ? 1 : i + j - 1;
+                samples.contrib += contrib / divide;
             }
 //            samples.num_samples++;
         }
@@ -97,10 +99,6 @@ Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const 
  */
 Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, const PathNode &light, int max_eye_index) {
     PathNode last_eye = eye_path[max_eye_index];
-    if (last_eye.type == LIGHT) {
-        last_eye = eye_path[max_eye_index - 1];
-        std::cout << "here" << std::endl;
-    }
     Vector3f radiance = computeEyeContrib(eye_path, max_eye_index);
     const Vector3f direction_to_light = (light.position - last_eye.position).normalized();
     float throughput = getDifferentialThroughput(last_eye.position, last_eye.surface_normal, light.position, light.surface_normal);
@@ -114,13 +112,13 @@ Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, 
 
 //TODO:: why do we not multiply by the throughput??
 Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
-    return light.emission;
+    Vector3f to_light = (light.position - eye.position).normalized();
+    return light.surface_normal.dot(to_light) < 0 ? light.emission : Vector3f(0,0,0);
 }
 
 Vector3f BDPT::computeLightTracingContrib(const std::vector<PathNode> &light_path, const PathNode &eye, int max_light_index) {
     return Vector3f(0, 0, 0);
 }
-
 
 /**
  * Computes the radiance for the combined eye and light
@@ -154,7 +152,7 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
 //    //brdf at eye node
 
 //    incoming_ray = Ray(eye_node.position, eye_path[max_eye_index - 1] AIR_IOR, true);
-//    incoming_ray = eye_path[max_eye_index - 1].outgoing_ray;
+    incoming_ray = eye_path[max_eye_index - 1].outgoing_ray;
 
 
     Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_light_node, eye_node.surface_normal,
@@ -216,79 +214,22 @@ Vector3f BDPT::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_
  */
 Vector3f BDPT::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
 
-    //TODO::check if need probability with respect to area
-//    Vector3f contrib = light_path[0].emission / (light_path[0].directional_prob * light_path[0].point_prob); //going to be direcitonal prob
-//    for (int i = 1; i < max_light_index; i++) {
-//        PathNode light_node = light_path[i];
+    //doing this in reverse (end of path to the light) works for reasons unknown to me
+    Vector3f contrib = Vector3f(1, 1, 1);
+    for (int i = max_light_index - 1; i >= 0; i--) {
+        PathNode node = light_path[i];
+        PathNode next = light_path[i + 1];
 
-//        //TODO:: check that I am multiplying by the right constant in light-tracing
-//        float constant = light_node.surface_normal.dot(light_node.outgoing_ray.d) / light_node.directional_prob;
-//        contrib = contrib.cwiseProduct(light_node.brdf) * constant;
-//    }
-//    return contrib;
-
-
-//    float throughput = getDifferentialThroughput(light_path[0].position, light_path[0].surface_normal,
-//            light_path[1].position, light_path[1].surface_normal);
-//    Vector3f contrib = light_path[0].emission * throughput / (light_path[0].point_prob * light_path[0].directional_prob);
-
-//    for (int i = 1; i < max_light_index; i++) {
-//        PathNode coming_from = light_path[i];
-//        PathNode arriving_at = light_path[i + 1];
-//        float cos_theta = arriving_at.surface_normal.dot(coming_from.outgoing_ray.d * -1.f);
-//        contrib = contrib.cwiseProduct(coming_from.brdf) * cos_theta / coming_from.directional_prob;
-//    }
-//    return contrib;
-
-//    Vector3f contrib = light_path[0].emission / (light_path[0].directional_prob * light_path[0].point_prob);
-//    float cos = light_path[1].surface_normal.dot(light_path[0].outgoing_ray.d * -1.f);
-//    contrib = contrib * cos;
-//    for (int i = 1; i < max_light_index; i++) {
-//        PathNode prev = light_path[i];
-//        PathNode curr = light_path[i];
-
-//        float cosine_theta = prev.surface_normal.dot(prev.outgoing_ray.d);
-//        contrib = prev.brdf.cwiseProduct(contrib) * cosine_theta / prev.directional_prob;
-//    }
-
-//    return contrib;
-
-    //TODO:: WHY DOES THIS PRODUCE BETTER RESULTS
-
-
-
-//    Vector3f contrib = light_path[0].emission / (light_path[0].point_prob);
-//    for (int i = 1; i <= max_light_index; i++) {
-//        PathNode prev = light_path[i - 1];
-//        float cos_theta = prev.outgoing_ray.d.dot(prev.surface_normal);
-////        float cos_theta = fmax(0, light_path[i].surface_normal.dot(prev.outgoing_ray.d * -1.f));
-//        contrib = contrib.cwiseProduct(prev.brdf) * cos_theta / prev.directional_prob;
-//    }
-//    return contrib;
-
-    Vector3f contrib = light_path[0].emission / (light_path[0].point_prob);
-    for (int i = 1; i <= max_light_index; i++) {
-        PathNode prev = light_path[i - 1];
-        PathNode curr = light_path[i];
-        float cos_theta = prev.outgoing_ray.d.dot(curr.surface_normal * -1.f);
-        contrib = contrib.cwiseProduct(curr.brdf) * cos_theta / prev.directional_prob;
+        Vector3f l = node.brdf * fabsf(node.outgoing_ray.d.dot(next.surface_normal)) / node.directional_prob;
+        contrib = l.cwiseProduct(contrib);
     }
-
-    return contrib;
+    return contrib / light_path[0].point_prob;
 
 //    Vector3f contrib = light_path[0].emission / light_path[0].point_prob;
-//    if (max_light_index >= 1) {
-//      float cosine_theta = fabsf(light_path[1].surface_normal.dot(light_path[0].outgoing_ray.d));
-//      contrib = contrib * cosine_theta / light_path[0].directional_prob;
-//    }
-
-//    //each iteration computes radiance arriving at node i + 1. so end up with radiance at node max_light_index
-//    for (int i = 1; i < max_light_index; i++) {
-//      PathNode start_node = light_path[i];
-////      PathNode end_node = light_path[i + 1];
-
-//      float cosine_theta = start_node.surface_normal.dot(start_node.outgoing_ray.d);
-//      contrib = contrib.cwiseProduct(start_node.brdf) * cosine_theta / start_node.directional_prob;
+//    for (int i = 0; i < max_light_index; i++) {
+//        PathNode node = light_path[i];
+//        contrib = contrib.cwiseProduct(node.brdf) / node.directional_prob;
+//        contrib = contrib * fabsf(light_path[i].surface_normal.dot(node.outgoing_ray.d));
 //    }
 //    return contrib;
 }
@@ -312,8 +253,6 @@ float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f 
     direction.normalize();
     float cos_node1 = fmax(0, normal1.dot(direction));
     float cos_node2 = fmax(0, normal2.dot(-1 * direction));
-
-    //TODO:: why do I need this fmax part?
     return  (cos_node1 * cos_node2) / squared_dist;
 }
 
@@ -387,6 +326,5 @@ float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const 
     }
 
     //TODO:: what about connecting probabilities?
-
     return eye_prob * light_prob;
 }

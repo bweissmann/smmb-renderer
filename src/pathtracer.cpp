@@ -98,9 +98,12 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
 
         // Ignore all Emitted Light
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
-        if (emitted_light.norm() > 0) {
-            return (depth == 0) ? emitted_light : Vector3f(0.f, 0.f, 0.f);
-//            return emitted_light;
+        if (emitted_light.norm() > 0 ) {
+            if (normal.dot(ray.d) < 0 && depth == 0) {
+                return emitted_light;
+            } else {
+                return Vector3f(0.f, 0.f, 0.f);
+            }
         }
 
         MaterialType type = BSDF::getType(mat);
@@ -202,6 +205,11 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
     }
 
     const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
+
+    if (direction_to_light.dot(light_info.normal) < 0) {
+        //return Vector3f(0, 0, 0);
+    }
+
     const float distance_squared = pow((surface_position - light_info.position).norm(), 2);
     const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
     const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
@@ -227,6 +235,7 @@ void PathTracer::trace(QRgb *imageData, const Scene& scene) {
         for (int j = 0; j < m_width; j++) {
             tracePixel3(j, i, scene, intensityValues, invViewMat);
         }
+        std::cout << i - m_output_height/4 << " / " << m_output_height/2<< std::endl;
     }
 
     toneMap(imageData, intensityValues);
@@ -287,9 +296,9 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
         output_radience += samples.contrib;
         total += samples.num_samples;
       }
-      std::cout << "rad : " << output_radience.norm() << std::endl;
-      std::cout << "samples " << total << std::endl;
-      std::cout << "" << std::endl;
+//      std::cout << "rad : " << output_radience.norm() << std::endl;
+//      std::cout << "samples " << total << std::endl;
+//      std::cout << "" << std::endl;
 
 //    std::cout << "total: " << total << std::endl;
 //    std::cout << "num samples: " << M_NUM_SAMPLES << std::endl;
