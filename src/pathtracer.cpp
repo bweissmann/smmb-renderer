@@ -23,12 +23,6 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
-    if (LIGHT_TRACING_ONLY) {
-        trace(imageData, scene);
-//        lightTrace(imageData, scene);
-        return;
-    }
-
     // Initialize the tread pool
     QThreadPool *threadPool = QThreadPool::globalInstance();
     std::vector<RenderThread *> threads;
@@ -44,7 +38,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
         for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
             int thread_index = x + (y * m_width);
             threads[thread_index] = new RenderThread;
-            threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat);
+            threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat, render_type);
             threads[thread_index]->setAutoDelete(false);
             threadPool->start(threads[thread_index]);
         }
@@ -56,7 +50,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     toneMap(imageData, intensityValues);
 }
 
-void PathTracer::tracePixel(int output_x, int output_y, const Scene& scene,
+void PathTracer::tracePixelPT(int output_x, int output_y, const Scene& scene,
                             Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix)
 {
     int pixel_x = output_x;
@@ -221,27 +215,7 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
 //BIDIRECTIONAL FUNCTIONS
 
-void PathTracer::trace(QRgb *imageData, const Scene& scene) {
-    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
-    Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
-
-    //initialize to zero
-    for (int i = 0; i < m_output_height * m_width; i++) {
-        intensityValues[i] = Vector3f(0, 0, 0);
-    }
-
-    //trace path from eye and from light for each pixel and connect
-    for (int i = 0; i < m_output_height; i++) {
-        for (int j = 0; j < m_width; j++) {
-            tracePixel3(j, i, scene, intensityValues, invViewMat);
-        }
-        std::cout << i - m_output_height/4 << " / " << m_output_height/2<< std::endl;
-    }
-
-    toneMap(imageData, intensityValues);
-}
-
-void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
+void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
                              Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix) {
     int pixel_x = output_x;
     int pixel_y = output_y + m_section_id * m_output_height;
@@ -277,8 +251,8 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
         //trace the paths
         std::vector<PathNode> eye_path = { eye_node };
         std::vector<PathNode> light_path = { light_node };
-        tracePath(world_camera_space_ray, scene, 0, eye_path);
-        tracePath(ray_info.ray, scene, 0, light_path);
+        tracePath(world_camera_space_ray, scene, 0, eye_path, false);
+        tracePath(ray_info.ray, scene, 0, light_path, true);
 
         if (eye_path.size() == 1) {
             continue;
@@ -311,7 +285,7 @@ void PathTracer::tracePixel3(int output_x, int output_y, const Scene& scene,
 
 
 //Refraction not considered in trace path yet
-void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &pathNodes) {
+void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &pathNodes, bool lightPath) {
     IntersectionInfo i;
 
     if(scene.getBVH().getIntersection(ray, &i, false)) {
@@ -331,7 +305,7 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         }
 
         MaterialType type = BSDF::getType(mat);
-        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
         const Ray next_ray = next_ray_info.ray;
         const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
         float pdf_rr = getContinueProbability(brdf);
@@ -340,7 +314,7 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             Vector3f N = ray.is_in_air ? normal : -normal;
             PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, pdf_rr * next_ray_info.prob, 0);
             pathNodes.push_back(node);
-            tracePath(next_ray, scene, depth + 1, pathNodes);
+            tracePath(next_ray, scene, depth + 1, pathNodes, lightPath);
         } else {
             Vector3f N = ray.is_in_air ? normal : -normal;
             PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, (1 - pdf_rr), 0);

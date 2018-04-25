@@ -11,27 +11,28 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
     BDPT_Samples samples = BDPT_Samples();
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
-    samples.num_samples = num_light_nodes;
+    samples.num_samples = 0;
     for (int i = 1; i < num_eye_nodes; i++) {
-//        if (i != 1) { continue; }
-
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
         } else if (eye_path[i].type == LIGHT) {
-            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0) / (i);
-//            samples.num_samples++;
+            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0) / (i + 1);
+            samples.num_samples++;
             continue;
          }
         for (int j = 0; j < num_light_nodes; j++) {
-//            if (j != 1) { continue; }
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
-                int divide = i + j - 1 == 0 ? 1 : i + j - 1;
+//                int divide = i + j - 1 == 0 ? 1 : i + j - 1;
+
+                //i think this is like saying the weight of the sample with this length is equal to 1 / length
+                int divide = (i + j + 1);
                 samples.contrib += contrib / divide;
             }
-//            samples.num_samples++;
+            samples.num_samples++;
         }
     }
+//    samples.contrib /= (num_eye_nodes + num_light_nodes + 2);
     return samples;
 }
 
@@ -167,8 +168,6 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
     total_contrib = total_contrib.cwiseProduct(eye_node_brdf);
     total_contrib *= throughput;
     return total_contrib;
-
-
 }
 
 /**
@@ -215,15 +214,23 @@ Vector3f BDPT::computeEyeContrib(const std::vector<PathNode> &eye_path, int max_
 Vector3f BDPT::computeLightContrib(const std::vector<PathNode> &light_path, int max_light_index) {
 
     //doing this in reverse (end of path to the light) works for reasons unknown to me
-    Vector3f contrib = Vector3f(1, 1, 1);
-    for (int i = max_light_index - 1; i >= 0; i--) {
-        PathNode node = light_path[i];
-        PathNode next = light_path[i + 1];
+//    Vector3f contrib = Vector3f(1, 1, 1);
+//    for (int i = max_light_index - 1; i >= 0; i--) {
+//        PathNode node = light_path[i];
+////        PathNode next = light_path[i + 1];
 
-        Vector3f l = node.brdf * fabsf(node.outgoing_ray.d.dot(next.surface_normal)) / node.directional_prob;
-        contrib = l.cwiseProduct(contrib);
+//        Vector3f l = node.brdf * fabsf(node.outgoing_ray.d.dot(node.surface_normal)) / node.directional_prob;
+//        contrib = l.cwiseProduct(contrib);
+//    }
+//    return contrib.cwiseProduct(light_path[0].emission) / light_path[0].point_prob;
+
+    Vector3f contrib = light_path[0].emission / light_path[0].point_prob;
+    for (int i = 0; i < max_light_index; i++) {
+        PathNode node = light_path[i];
+        contrib = contrib.cwiseProduct(node.brdf) / node.directional_prob;
+        contrib = contrib * fabsf(light_path[i].surface_normal.dot(node.outgoing_ray.d)); /** fabsf(light_path[i + 1].surface_normal.dot(node.outgoing_ray.d));*/
     }
-    return contrib / light_path[0].point_prob;
+    return contrib;
 
 //    Vector3f contrib = light_path[0].emission / light_path[0].point_prob;
 //    for (int i = 0; i < max_light_index; i++) {
@@ -299,7 +306,6 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
 
     //TODO::what to do for paths where light = 0 or eye = 0 (as max)
     return 1.f / prob_sum;
-
 }
 
 float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
