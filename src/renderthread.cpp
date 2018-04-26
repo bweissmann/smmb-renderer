@@ -24,7 +24,6 @@ void RenderThread::run()
             }
         }
     }
-    std::cout << "(" << m_x / m_range << ", " << m_y / m_range << ")" << std::endl;
     StatusLogger::getInstance()->updateStatus(m_x, m_y); // Tell the path tracer that our square is done for logging
 }
 

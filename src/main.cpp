@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
 {
     unsigned int current_time = time(NULL);
     srand(current_time);
-    srand(1524604598); // FIXED SEED
     std::cout << "Random Seed: " << current_time << std::endl;
     QCoreApplication a(argc, argv);
 

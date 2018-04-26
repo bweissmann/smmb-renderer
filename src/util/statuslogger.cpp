@@ -40,8 +40,11 @@ void StatusLogger::updateStatus(int x, int y) {
     int x_index = x / m_parallel_range;
     int y_index = y / m_parallel_range;
     finished_sections[x_index + y_index * (m_image_width / m_parallel_range)] = true;
+    if (SHOULD_PRINT_STATUS)
+        std::cout << "(" << y_index << ", " << x_index << ")" << std::endl;
     status_mutex.unlock();
     printStatus();
+
 }
 
 void StatusLogger::printStatus() {

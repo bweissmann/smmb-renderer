@@ -18,7 +18,11 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
         if (eye_path[i].type == IDEAL_SPECULAR || eye_path[i].type == REFRACTION) {
             continue;
         } else if (eye_path[i].type == LIGHT) {
-            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0) / (i);
+            float weight = computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
+            if (eye_path.size() == 2) {
+                weight = 1.f;
+            }
+            samples.contrib += BDPT::computeContribution(eye_path, { eye_path[i] }, i - 1, 0) * weight;
             samples.num_samples++;
             continue;
          }
@@ -27,8 +31,8 @@ BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> 
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
                 int divide = (i + j);
                 float weight = computePathWeight(eye_path, light_path, i, j);
-                samples.contrib += contrib / divide;
-//                samples.contrib += contrib * weight;
+//                samples.contrib += contrib / divide;
+                samples.contrib += contrib * weight;
             }
             samples.num_samples++;
         }
@@ -279,6 +283,10 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
     float true_prob = computePathProbability(eye_path, light_path, max_eye_index, max_light_index);
     int n = max_eye_index + max_light_index + 2;
 
+    if (true_prob < 1e-8) {
+        return 0.f;
+    }
+
     std::vector<PathNode> c_eye_path;
     std::vector<PathNode> c_light_path;
 
@@ -291,16 +299,20 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
         c_light_path.push_back(eye_path[i]);
     }
 
-    float sum = 0.f;
-    for (int s = 0; s < n; s++) {
+    for (int i = 0; i < n; i++) {
+        c_eye_path.push_back(c_light_path[n - i - 1]);
+    }
 
-        float c_prob = computePathProbability(c_eye_path, c_light_path, s - 1, n - s - 1);
+    float sum = 0.f;
+    for (int s = 2; s < n; s++) {
+
+        float c_prob = computePathProbability(c_eye_path, c_light_path, s - 1, n - 1 - s);
 
         sum += pow(c_prob / true_prob, 2);
 
-        //transfer one to other path
-        c_eye_path.push_back(c_light_path[c_light_path.size() - 1]);
-        c_light_path.pop_back();
+//        //transfer one to other path
+//        c_eye_path.push_back(c_light_path[c_light_path.size() - 1]);
+//        c_light_path.pop_back();
     }
     float output = 1.f / sum;
     return isnan(output) ? 0.f : output;
@@ -309,23 +321,26 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
 float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                    int max_eye_index, int max_light_index) {
     float eye_prob = 1.f;
-    for (int i = 0; i < max_eye_index; i++) {
-        PathNode node = eye_path[i];
-        PathNode next = eye_path[i + 1];
+    if (eye_path.size() > 0) {
+        eye_prob = eye_path[0].point_prob;
+        for (int i = 0; i < max_eye_index; i++) {
+            PathNode node = eye_path[i];
+            PathNode next = eye_path[i + 1];
 
-        float dir_prob = node.directional_prob;
-        Vector3f outgoing_direction = (next.position - node.position).normalized();
-        float cosine_theta = fabsf(node.surface_normal.dot(outgoing_direction));
+            float dir_prob = node.directional_prob;
+            Vector3f outgoing_direction = (next.position - node.position).normalized();
+            float cosine_theta = fabsf(node.surface_normal.dot(outgoing_direction));
 
-        if (i > 0) {
-            PathNode prev = eye_path[i - 1];
-            Vector3f incoming_direction = (node.position - prev.position).normalized();
-            dir_prob = BSDF::getBsdfDirectionalProb(incoming_direction, outgoing_direction,
-                                         node.surface_normal, node.mat, node.type, 1.f);
-            dir_prob *= PathTracer::getContinueProbability(node.brdf);
+            if (i > 0) {
+                PathNode prev = eye_path[i - 1];
+                Vector3f incoming_direction = (node.position - prev.position).normalized();
+                dir_prob = BSDF::getBsdfDirectionalProb(incoming_direction, outgoing_direction,
+                                             node.surface_normal, node.mat, node.type, 1.f);
+                dir_prob *= PathTracer::getContinueProbability(node.brdf);
+            }
+            float geometry_term = getDifferentialThroughputButWithAbsNotMax(node.position, node.surface_normal, next.position, next.surface_normal);
+            eye_prob *= (dir_prob * geometry_term) / cosine_theta;
         }
-        float geometry_term = 1; /*getDifferentialThroughput(node.position, node.surface_normal, next.position, next.surface_normal);*/
-        eye_prob *= (dir_prob * geometry_term) / cosine_theta;
     }
 
 
@@ -346,7 +361,7 @@ float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const 
                                              node.surface_normal, node.mat, node.type, 1.f);
                 dir_prob *= PathTracer::getContinueProbability(node.brdf);
             }
-            float geometry_term = 1; /* getDifferentialThroughput(node.position, node.surface_normal, next.position, next.surface_normal);*/
+            float geometry_term = 1; getDifferentialThroughputButWithAbsNotMax(node.position, node.surface_normal, next.position, next.surface_normal);
             light_prob *= (dir_prob * geometry_term) / cosine_theta;
         }
     }

@@ -29,14 +29,13 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 20;
+    const int M_NUM_SAMPLES = 600;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
     const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
-
 
     void toneMap(QRgb *imageData, Eigen::Vector3f *intensityValues);
     Eigen::Vector3f traceRay(const Ray& r, const Scene &scene, int depth);

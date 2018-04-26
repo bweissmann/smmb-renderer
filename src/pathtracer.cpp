@@ -283,23 +283,11 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 
 
         BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
-//        if (output_y == 110 && output_x == 76) {
-//            std::cout << samples.contrib << std::endl;
-//        }
         output_radience += samples.contrib;
         total += samples.num_samples;
       }
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
     //    intensityValues[output_index] = output_radience / total;
-
-//    if (output_y == 110 && output_x == 76) {
-
-//        std::cout << "x : " << output_x << " y : " << output_y << std::endl;
-//        std::cout << intensityValues[output_index].x() << " " <<  intensityValues[output_index].y()  << " " <<
-//                  intensityValues[output_index].z() << std::endl;
-//        std::cout << "" << std::endl;
-
-//    }
 }
 
 
@@ -318,7 +306,7 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0) {
             Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1, 1);
+            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1.f / (2.f * M_PI), 1);
             pathNodes.push_back(node);
             return;
         }
