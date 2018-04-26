@@ -296,20 +296,14 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
 
         float c_prob = computePathProbability(c_eye_path, c_light_path, s - 1, n - s - 1);
 
-        sum += pow(c_prob, 2);
+        sum += pow(c_prob / true_prob, 2);
 
         //transfer one to other path
         c_eye_path.push_back(c_light_path[c_light_path.size() - 1]);
         c_light_path.pop_back();
     }
-    if (true_prob / sum < 1e-4) {
-        std::cout << true_prob << " " << sum << std::endl;
-    }
-    float output = pow(true_prob, 2) / sum;
-    if (isnan(output)) {
-        output = 0.f;
-    }
-    return output;
+    float output = 1.f / sum;
+    return isnan(output) ? 0.f : output;
 }
 
 float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
@@ -330,7 +324,7 @@ float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const 
                                          node.surface_normal, node.mat, node.type, 1.f);
             dir_prob *= PathTracer::getContinueProbability(node.brdf);
         }
-        float geometry_term = getDifferentialThroughputButWithAbsNotMax(node.position, node.surface_normal, next.position, next.surface_normal);
+        float geometry_term = 1; /*getDifferentialThroughput(node.position, node.surface_normal, next.position, next.surface_normal);*/
         eye_prob *= (dir_prob * geometry_term) / cosine_theta;
     }
 
@@ -352,7 +346,7 @@ float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const 
                                              node.surface_normal, node.mat, node.type, 1.f);
                 dir_prob *= PathTracer::getContinueProbability(node.brdf);
             }
-            float geometry_term = getDifferentialThroughputButWithAbsNotMax(node.position, node.surface_normal, next.position, next.surface_normal);
+            float geometry_term = 1; /* getDifferentialThroughput(node.position, node.surface_normal, next.position, next.surface_normal);*/
             light_prob *= (dir_prob * geometry_term) / cosine_theta;
         }
     }
