@@ -23,29 +23,44 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
-    // Initialize the tread pool
-    QThreadPool *threadPool = QThreadPool::globalInstance();
-    std::vector<RenderThread *> threads;
-    threads.resize(m_width * m_output_height);
-
-    // Setup intensity values and logging
     Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
-    StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
 
-    // start each thread
-    for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
-        for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
-            int thread_index = x + (y * m_width);
-            threads[thread_index] = new RenderThread;
-            threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat, render_type);
-            threads[thread_index]->setAutoDelete(false);
-            threadPool->start(threads[thread_index]);
+    if (should_run_parallel) {
+        // Initialize the tread pool
+        QThreadPool *threadPool = QThreadPool::globalInstance();
+        std::vector<RenderThread *> threads;
+        threads.resize(m_width * m_output_height);
+
+        // Setup intensity values and logging
+        StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
+
+        // start each thread
+        for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
+            for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
+                int thread_index = x + (y * m_width);
+                threads[thread_index] = new RenderThread;
+                threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat, render_type);
+                threads[thread_index]->setAutoDelete(false);
+                threadPool->start(threads[thread_index]);
+            }
+        }
+
+        // Wait for rendering to finish
+        threadPool->waitForDone();
+    } else {
+        for (int x = 0; x < m_width; x ++) {
+            for (int y = 0; y < m_output_height; y++) {
+                switch (render_type) {
+                case PATH_TRACING:
+                    tracePixelPT(x, y, scene, intensityValues, invViewMat);
+                    break;
+                case BIDIRECTIONAL:
+                    tracePixelBD(x, y, scene, intensityValues, invViewMat);
+                }
+            }
         }
     }
-
-    // Wait for rendering to finish
-    threadPool->waitForDone();
 
     toneMap(imageData, intensityValues);
 }
@@ -237,8 +252,9 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         //first node in eye path
         const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
         const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
+        const float cosine_theta = eye_normal_world.dot(world_camera_space_ray.d);
         PathNode eye_node = PathNode(world_camera_space_ray.o, eye_normal_world, Vector3f(1, 1, 1),
-                                 Vector3f(0, 0, 0), world_camera_space_ray, 1, 1);
+                                 Vector3f(0, 0, 0), world_camera_space_ray, cosine_theta, 1);
 
         //first node in light path
         SampledLightInfo light_info = scene.sampleLight();
@@ -267,20 +283,23 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 
 
         BDPT_Samples samples = BDPT::combinePaths(scene, eye_path, light_path);
+//        if (output_y == 110 && output_x == 76) {
+//            std::cout << samples.contrib << std::endl;
+//        }
         output_radience += samples.contrib;
         total += samples.num_samples;
       }
-//      std::cout << "rad : " << output_radience.norm() << std::endl;
-//      std::cout << "samples " << total << std::endl;
-//      std::cout << "" << std::endl;
-
-//    std::cout << "total: " << total << std::endl;
-//    std::cout << "num samples: " << M_NUM_SAMPLES << std::endl;
-//    std::cout << "" << std::endl;
-
     intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
-//    intensityValues[output_index] = output_radience / total;
+    //    intensityValues[output_index] = output_radience / total;
 
+//    if (output_y == 110 && output_x == 76) {
+
+//        std::cout << "x : " << output_x << " y : " << output_y << std::endl;
+//        std::cout << intensityValues[output_index].x() << " " <<  intensityValues[output_index].y()  << " " <<
+//                  intensityValues[output_index].z() << std::endl;
+//        std::cout << "" << std::endl;
+
+//    }
 }
 
 

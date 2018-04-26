@@ -20,9 +20,7 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
     switch (type) {
     case IDEAL_DIFFUSE:
         return sampleIdealDiffuseImportance(position, incoming_ray, surface_normal);
-//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
     case GLOSSY_SPECULAR:
-//        return uniformSampleHemisphere(position, incoming_ray, surface_normal);
         return sampleGlossySpecularImportance(position, incoming_ray, surface_normal, mat);
     case IDEAL_SPECULAR:
         return idealSpecularReflection(position, incoming_ray, surface_normal);
@@ -60,7 +58,7 @@ SampledRayInfo SampleRay::sampleIdealDiffuseImportance(const Vector3f &position,
     const Vector3f worldspace_direction = tangentToWorldSpace(surface_normal, tangentspace_direction);
 
     Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
-    float cos_phi = worldspace_direction.dot(surface_normal);
+    float cos_phi = fabs(worldspace_direction.dot(surface_normal));
     return SampledRayInfo(ray, cos_phi / M_PI);
 
 

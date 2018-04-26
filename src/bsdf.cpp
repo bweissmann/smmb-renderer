@@ -100,7 +100,7 @@ float BSDF::getBsdfDirectionalProb(const Vector3f &incoming, const Vector3f &out
 
 //check this for probability
 float BSDF::cosineWeightedProb(const Vector3f &outgoing, Vector3f normal) {
-    return outgoing.dot(normal) / M_PI;
+    return fabsf(outgoing.dot(normal) / M_PI);
 }
 
 float BSDF::glossyWeightedProb(const Vector3f &incoming, const Vector3f &outgoing, Vector3f normal, const tinyobj::material_t &mat) {

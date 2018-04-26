@@ -3864,15 +3864,15 @@ renderthread.o: ../src/renderthread.cpp ../src/renderthread.h \
 		../src/Eigen/StdVector \
 		../src/Eigen/src/StlSupport/StdVector.h \
 		../src/Eigen/src/StlSupport/details.h \
-		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QDebug \
-		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qdebug.h \
-		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QCoreApplication \
-		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qcoreapplication.h \
 		../src/pathtracer.h \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers/QImage \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers/qimage.h \
 		../src/bsdf.h \
 		../src/util/pathnode.h \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QDebug \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qdebug.h \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QCoreApplication \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qcoreapplication.h \
 		../src/util/statuslogger.h \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/QMutex \
 		../../../../Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/qmutex.h
@@ -4323,7 +4323,10 @@ bdpt.o: ../src/bdpt.cpp ../src/bdpt.h \
 		../src/scene/shape/triangle.h \
 		../src/Eigen/StdVector \
 		../src/Eigen/src/StlSupport/StdVector.h \
-		../src/Eigen/src/StlSupport/details.h
+		../src/Eigen/src/StlSupport/details.h \
+		../src/pathtracer.h \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers/QImage \
+		../../../../Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers/qimage.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o bdpt.o ../src/bdpt.cpp
 
 bdpt2.o: ../src/bdpt2.cpp ../src/bdpt2.h \
