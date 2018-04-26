@@ -28,6 +28,6 @@ Vector3f MathUtils::refract(Vector3f in, Vector3f normal, float eta) {
 }
 
 bool MathUtils::isSameDirection(Vector3f target, Vector3f input) {
-    const float epsilon = 0.0001;
+    const float epsilon = 0.01;
     return (target - input).norm() < epsilon;
 }
