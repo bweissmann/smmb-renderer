@@ -1,2 +1,5 @@
 build-release/*
 output_images/*
+example-scenes/anim/*.xml
+exapmle-scenes/anim/models/*.obj
+exapmle-scenes/anim/models/*.mtl
