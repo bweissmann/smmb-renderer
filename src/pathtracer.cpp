@@ -12,7 +12,6 @@
 #include "util/statuslogger.h"
 #include "bdpt.h"
 #include <QThreadPool>
-#include "bdpt2.h"
 
 using namespace Eigen;
 
@@ -253,22 +252,35 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
         const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
         const float cosine_theta = eye_normal_world.dot(world_camera_space_ray.d);
-        PathNode eye_node = PathNode(world_camera_space_ray.o, eye_normal_world, Vector3f(1, 1, 1),
-                                 Vector3f(0, 0, 0), world_camera_space_ray, cosine_theta, 1);
+//        PathNode eye_node = PathNode(world_camera_space_ray.o, eye_normal_world, Vector3f(1, 1, 1),
+//                                 Vector3f(0, 0, 0), world_camera_space_ray, cosine_theta, 1);
+
+        PathNode eye = PathNode(world_camera_space_ray, Vector3f(1, 1, 1), world_camera_space_ray.o, eye_normal_world, EYE,
+                        true, 1.f, cosine_theta, 1.f);
+
 
         //first node in light path
         SampledLightInfo light_info = scene.sampleLight();
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
         SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
-        PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(1, 1, 1),
-                                       light_info.emission, ray_info.ray, LIGHT, ray_info.prob, light_info.prob);
+//        PathNode light_node = PathNode(light_info.position, light_info.normal, Vector3f(1, 1, 1),
+//                                       light_info.emission, ray_info.ray, LIGHT, ray_info.prob, light_info.prob);
 
+
+        PathNode light = PathNode(ray_info.ray, light_info.emission / light_info.prob, light_info.position, light_info.normal,
+                          LIGHT, true, 1.f, ray_info.prob, light_info.prob);
+
+
+        std::vector<PathNode> eye_path = { eye };
+        std::vector<PathNode> light_path = { light};
+        tracePath(world_camera_space_ray, scene, 0, eye_path, Vector3f(1, 1, 1));
+        tracePath(ray_info.ray, scene, 0, light_path, Vector3f(1, 1, 1));
 
         //trace the paths
-        std::vector<PathNode> eye_path = { eye_node };
-        std::vector<PathNode> light_path = { light_node };
-        tracePath(world_camera_space_ray, scene, 0, eye_path, false);
-        tracePath(ray_info.ray, scene, 0, light_path, true);
+//        std::vector<PathNode> eye_path = { eye_node };
+//        std::vector<PathNode> light_path = { light_node };
+//        tracePath(world_camera_space_ray, scene, 0, eye_path, false);
+//        tracePath(ray_info.ray, scene, 0, light_path, true);
 
         if (eye_path.size() == 1) {
             continue;
@@ -326,6 +338,62 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             Vector3f N = ray.is_in_air ? normal : -normal;
             PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, (1 - pdf_rr), 0);
             pathNodes.push_back(node);
+        }
+    }
+}
+
+void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &nodes, const Vector3f &prev_brdf) {
+    IntersectionInfo i;
+    if (scene.getBVH().getIntersection(ray, &i, false)) {
+
+        //compute the contribution that will arrive at this node
+        int lastNodeIndex = nodes.size() - 1;
+        PathNode lastNode = nodes[lastNodeIndex];
+        float cosine_theta = fabsf(lastNode.surface_normal.dot(ray.d));
+        Vector3f contrib = lastNode.contrib.cwiseProduct(prev_brdf) * cosine_theta / lastNode.directional_prob;
+
+        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
+        const tinyobj::real_t *e = mat.emission; //Emitted color
+        const Vector3f normal = t->getNormal(i); //surface normal
+
+        //Deals with light sources
+        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
+        if (emitted_light.norm() > 0) {
+
+            //check that the light is facing the right direction
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            if (N.dot(ray.d) < 0) {
+                if (lastNodeIndex == 0) {
+                    contrib = emitted_light;
+                } else {
+                    float throughput = BDPT::getDifferentialThroughput(i.hit, N, lastNode.position, lastNode.surface_normal);
+                    contrib = prev_brdf.cwiseProduct(lastNode.contrib.cwiseProduct(emitted_light)) * throughput;
+                }
+                PathNode node(ray, contrib, i.hit, N, LIGHT, mat, true, 1.f, 1.f / (2.f * M_PI), 1.f);
+                nodes.push_back(node);
+            }
+            return;
+        }
+
+        //get type of material
+        MaterialType type = BSDF::getType(mat);
+        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        const Ray next_ray = next_ray_info.ray;
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+        float pdf_rr = getContinueProbability(brdf);
+
+        if (MathUtils::random() < pdf_rr) {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            float directional_prob = next_ray_info.prob * pdf_rr;
+            PathNode node(next_ray, contrib, next_ray.o, N, type, mat, true, 1.f, directional_prob, 0);
+            nodes.push_back(node);
+            tracePath(next_ray, scene, depth + 1, nodes, brdf);
+        } else {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(ray, contrib, next_ray.o, N, type, mat, true, 1.f, (1 - pdf_rr), 0);
+            nodes.push_back(node);
         }
     }
 }

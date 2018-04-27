@@ -28,7 +28,7 @@ newmtl rightSphere
     Kd 0.41 0.01 0.41
     Ks 0 0 0
     Ks 0.90 0.90 0.90
-    #  Tf 0.10 0.10 0.10
+    #Tf 0.10 0.10 0.10
     # Ns 5
     Ns 1000
     Ni 1.5
@@ -65,8 +65,8 @@ newmtl rightWall
     illum 2
     Ka 0.161 0.133 0.427 # Blue
     Kd 0.161 0.133 0.427
-	# Ks 0 0 0
-    Ks 0.5 0.5 0.5
+	 Ks 0 0 0
+    #Ks 0.5 0.5 0.5
     Ns 10
 
 newmtl leftWall

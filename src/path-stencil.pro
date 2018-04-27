@@ -32,8 +32,7 @@ SOURCES += main.cpp \
     renderthread.cpp \
     bsdf.cpp \
     util/statuslogger.cpp \
-    bdpt.cpp \
-    bdpt2.cpp
+    bdpt.cpp
 
 HEADERS += \
     pathtracer.h \
@@ -362,5 +361,4 @@ HEADERS += \
     bsdf.h \
     util/statuslogger.h \
     util/pathnode.h \
-    bdpt.h \
-    bdpt2.h
+    bdpt.h

@@ -29,7 +29,7 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 1;
+    const int M_NUM_SAMPLES = 100;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
@@ -44,6 +44,7 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &pathNodes, bool lightPath);
+    void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &nodes, const Eigen::Vector3f &prev_brdf);
 
 
  };
