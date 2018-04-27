@@ -1,15 +1,15 @@
 <scenefile>
 	<cameradata>
-		<pos x="0" y="{{Y}}" z="{{Z}}"/>
+		<pos x="{{X}}" y="{{Y}}" z="{{Z}}"/>
 		<up x="0" y="1" z="0"/>
-		<focus x="0" y="1" z="0"/>
+		<focus x="{{LOOK_X}}" y="{{LOOK_Y}}" z="{{LOOK_Z}}"/>
 		<heightangle v="90"/>
 	</cameradata>
 
 	<object type="tree" name="root">
 		<transblock>
 			<translate x="0" y="0" z="0"/>
-			<object type="primitive" name="mesh" filename="../models/CornellBox/CornellBox-Sphere.obj">
+			<object type="primitive" name="mesh" filename="{{OBJ_FILEPATH}}">
 			</object>
 		</transblock>
 	</object>
