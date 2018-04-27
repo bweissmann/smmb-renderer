@@ -29,11 +29,7 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-<<<<<<< HEAD
-    const int M_NUM_SAMPLES = 100;
-=======
     const int M_NUM_SAMPLES = 50;
->>>>>>> 89799cb15d9b23f4be25c2d404f5b13e903e8108
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
