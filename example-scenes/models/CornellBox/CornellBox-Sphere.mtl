@@ -65,9 +65,15 @@ newmtl rightWall
     illum 2
     Ka 0.161 0.133 0.427 # Blue
     Kd 0.161 0.133 0.427
+<<<<<<< HEAD
 	 Ks 0 0 0
     #Ks 0.5 0.5 0.5
     Ns 10
+=======
+	Ks 0 0 0
+    # Ks 0.5 0.5 0.5
+    # Ns 10
+>>>>>>> 89799cb15d9b23f4be25c2d404f5b13e903e8108
 
 newmtl leftWall
 	Ns 10.0000
