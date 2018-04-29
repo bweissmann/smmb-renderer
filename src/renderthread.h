@@ -15,8 +15,9 @@ class RenderThread : public QRunnable
 {
 public:
     /* Set all the data we need to calculate rays */
-    void setData(PathTracer *p, Eigen::Vector3f *intensityValues, const Scene &scene, int x, int y,
+    void setData(PathTracer *p, PixelInfo *pixelInfo, const Scene &scene, int x, int y,
                  int range, Eigen::Matrix4f *invViewMatrix, RenderType render_type);
+
 
 private:
     void run();
@@ -24,7 +25,7 @@ private:
     /* Not a perfect solution to store a ton of member variables
      * to do our computation but it gets the job done. */
     PathTracer *m_pathTracer;
-    Eigen::Vector3f *m_intensityValues;
+    PixelInfo *m_pixelInfo;
     Scene m_scene;
     int m_x;
     int m_y;

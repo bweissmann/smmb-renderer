@@ -23,6 +23,8 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
     Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
+    PixelInfo pixelInfo[m_width * m_output_height];
+
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
 
     if (should_run_parallel) {
@@ -39,7 +41,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
             for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
                 int thread_index = x + (y * m_width);
                 threads[thread_index] = new RenderThread;
-                threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat, render_type);
+                threads[thread_index]->setData(this, pixelInfo, scene, x, y, PARALLEL_RANGE, &invViewMat, render_type);
                 threads[thread_index]->setAutoDelete(false);
                 threadPool->start(threads[thread_index]);
             }
@@ -52,20 +54,24 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
             for (int y = 0; y < m_output_height; y++) {
                 switch (render_type) {
                 case PATH_TRACING:
-                    tracePixelPT(x, y, scene, intensityValues, invViewMat);
+                    tracePixelPT(x, y, scene, pixelInfo, invViewMat);
                     break;
                 case BIDIRECTIONAL:
-                    tracePixelBD(x, y, scene, intensityValues, invViewMat);
+                    tracePixelBD(x, y, scene, pixelInfo, invViewMat);
                 }
             }
         }
     }
 
-    toneMap(imageData, intensityValues);
+    if (!should_denoise) {
+        toneMap(imageData, pixelInfo);
+    } else {
+        //TODO:: call denoise function here
+    }
 }
 
 void PathTracer::tracePixelPT(int output_x, int output_y, const Scene& scene,
-                            Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix)
+                            PixelInfo *pixelInfo, const Eigen::Matrix4f &invViewMatrix)
 {
     int pixel_x = output_x;
     int pixel_y = output_y + m_section_id * m_output_height;
@@ -88,8 +94,7 @@ void PathTracer::tracePixelPT(int output_x, int output_y, const Scene& scene,
 
         output_radience += traceRay(world_camera_space_ray, scene, 0);
     }
-
-    intensityValues[output_index] = output_radience / M_NUM_SAMPLES;
+    pixelInfo[output_index].radiance = output_radience / M_NUM_SAMPLES;
 }
 
 Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
@@ -178,11 +183,11 @@ float PathTracer::getContinueProbability(Vector3f brdf) {
     return 0.5f; // Fixed Continue Probability
 }
 
-void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
+void PathTracer::toneMap(QRgb *imageData, PixelInfo *pixelInfo) {
     for(int y = 0; y < m_output_height; ++y) {
         for(int x = 0; x < m_width; ++x) {
             int offset = x + (y * m_width);
-            Vector3f hdr_intensity = intensityValues[offset];
+            Vector3f hdr_intensity = pixelInfo[offset].radiance;
             Vector3f ones(1, 1, 1);
             Vector3f out_intensity = hdr_intensity.cwiseQuotient(ones + hdr_intensity) * 256;
             imageData[offset] = qRgb(out_intensity.x(), out_intensity.y(), out_intensity.z());
@@ -229,7 +234,7 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
 
 //BIDIRECTIONAL FUNCTIONS
 void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
-                             Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix) {
+                             PixelInfo *pixelInfo, const Eigen::Matrix4f &invViewMatrix) {
     int pixel_x = output_x;
     int pixel_y = output_y + m_section_id * m_output_height;
     int output_index = output_x + output_y * m_width;
@@ -285,7 +290,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         output_radience += pixelInfo.radiance;
       }
     total_info.radiance /= M_NUM_SAMPLES;
-    intensityValues[output_index] = total_info.radiance;
+    pixelInfo[output_index] = total_info;
 }
 
 //Refraction not considered in trace path yet

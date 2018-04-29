@@ -17,6 +17,8 @@ struct SampleInfo {
 
 struct PixelInfo {
 
+    PixelInfo() : num_samples(0), samplesPerPixel(std::vector<SampleInfo>(0)), radiance(Eigen::Vector3f(0, 0, 0)) {}
+
     PixelInfo(int num_samples) : num_samples(num_samples), samplesPerPixel(std::vector<SampleInfo>(num_samples)),
         radiance(Eigen::Vector3f(0, 0, 0)) {}
 

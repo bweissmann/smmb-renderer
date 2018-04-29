@@ -19,10 +19,10 @@ public:
     PathTracer(int width, int image_height, int output_height, int section_id);
     void traceScene(QRgb *imageData, const Scene &scene);
     void tracePixelPT(int pixel_x, int pixel_y, const Scene& scene,
-                    Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
-
+                    PixelInfo *pixelInfo, const Eigen::Matrix4f &invViewMatrix);
     void tracePixelBD(int output_x, int output_y, const Scene& scene,
-                     Eigen::Vector3f *intensityValues, const Eigen::Matrix4f &invViewMatrix);
+                     PixelInfo *pixelInfo, const Eigen::Matrix4f &invViewMatrix);
+
 
     static float getContinueProbability(Eigen::Vector3f brdf);
 
@@ -36,9 +36,13 @@ private:
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
+    /* Indicates if image should be denoised or tone-mapped */
+    bool should_denoise = false;
+
     const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
 
-    void toneMap(QRgb *imageData, Eigen::Vector3f *intensityValues);
+    void toneMap(QRgb *imageData, PixelInfo *pixelInfo);
+
     Eigen::Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
     bool lightIsVisible(Eigen::Vector3f light_position, Eigen::Vector3f surface_position, const Scene& scene);
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
