@@ -6,6 +6,7 @@
 #include "scene/scene.h"
 #include "bsdf.h"
 #include "util/pathnode.h"
+#include "util/sampleinfo.h"
 
 enum RenderType {
     PATH_TRACING,

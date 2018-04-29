@@ -361,4 +361,5 @@ HEADERS += \
     bsdf.h \
     util/statuslogger.h \
     util/pathnode.h \
-    bdpt.h
+    bdpt.h \
+    util/sampleinfo.h

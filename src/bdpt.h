@@ -4,6 +4,7 @@
 #include "Eigen/Dense"
 #include "util/pathnode.h"
 #include "scene/scene.h"
+#include "util/sampleinfo.h"
 
 struct BDPT_Samples {
 
@@ -19,7 +20,7 @@ class BDPT
 public:
     BDPT();
 
-    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo2 &info);
+    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info);
 
     static bool isVisible(const Scene&scene, const Eigen::Vector3f &position1, const Eigen::Vector3f &position2);
 

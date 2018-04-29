@@ -237,7 +237,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
     Vector3f output_radience = Vector3f::Zero();
     Vector3f eye_center(0, 0, 0);
     Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
-    PixelInfo2 total_info = PixelInfo2(0);
+    PixelInfo total_info = PixelInfo(0);
     for (int i = 0; i < M_NUM_SAMPLES; i++) {
 
         /* Sample an x and y randomly within the sensor square */
@@ -278,7 +278,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         }
 
         size = light_path.size() * (eye_path.size() - 1);
-        PixelInfo2 pixelInfo = PixelInfo2(light_path.size() * (eye_path.size() - 1));
+        PixelInfo pixelInfo = PixelInfo(light_path.size() * (eye_path.size() - 1));
         BDPT::combinePaths2(scene, eye_path, light_path, pixelInfo);
 
         total_info.addInfo(pixelInfo);

@@ -9,7 +9,7 @@ BDPT::BDPT() {
 
 }
 
-void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo2 &info) {
+void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info) {
 
     //compute closest one and normal
     Vector3f normal = eye_path[1].surface_normal;
@@ -25,10 +25,10 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
                 weight = 1.f;
             }
             Vector3f weighted_contrib = eye_path[i].contrib * weight;
-            info.sample_radiance[index] = weighted_contrib;
-            info.sample_color[index] = color;
-            info.sample_normal[index] = normal;
-            info.sample_depth[index] = depth;
+            info.samplesPerPixel[index].sample_radiance = weighted_contrib;
+            info.samplesPerPixel[index].sample_color = color;
+            info.samplesPerPixel[index].sample_normal = normal;
+            info.samplesPerPixel[index].sample_depth = depth;
             info.radiance += weighted_contrib;
             index++;
             continue;
@@ -41,12 +41,11 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
                 Vector3f weighted_contrib = contrib * weight;
 
 
-                info.sample_radiance[index] = weighted_contrib;
-                info.sample_color[index] = color;
-                info.sample_normal[index] = normal;
-                info.sample_depth[index] = depth;
+                info.samplesPerPixel[index].sample_radiance = weighted_contrib;
+                info.samplesPerPixel[index].sample_color = color;
+                info.samplesPerPixel[index].sample_normal = normal;
+                info.samplesPerPixel[index].sample_depth = depth;
                 info.radiance += weighted_contrib;
-
             }
             index++;
         }
