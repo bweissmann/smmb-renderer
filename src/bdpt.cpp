@@ -13,7 +13,18 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
 
     //compute closest one and normal
     Vector3f normal = eye_path[1].surface_normal;
-    Vector3f color = Vector3f(1, 1, 1);
+
+    Vector3f color;
+    Vector3f emitted(eye_path[1].mat.emission[0], eye_path[1].mat.emission[2], eye_path[1].mat.emission[2]);
+    if (emitted.norm() > 0) {
+        color = emitted;
+    } else {
+        if (eye_path[1].type == IDEAL_DIFFUSE) {
+            color = Vector3f(eye_path[1].mat.diffuse[0], eye_path[1].mat.diffuse[2], eye_path[1].mat.diffuse[2]);
+        } else {
+            color = Vector3f(eye_path[1].mat.specular[0], eye_path[1].mat.specular[2], eye_path[1].mat.specular[2]);
+        }
+    }
     float depth = (eye_path[1].position - eye_path[2].position).norm();
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
