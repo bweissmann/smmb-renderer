@@ -32,7 +32,8 @@ SOURCES += main.cpp \
     renderthread.cpp \
     bsdf.cpp \
     util/statuslogger.cpp \
-    bdpt.cpp
+    bdpt.cpp \
+    denoiser/denoiser.cpp
 
 HEADERS += \
     pathtracer.h \
@@ -362,4 +363,5 @@ HEADERS += \
     util/statuslogger.h \
     util/pathnode.h \
     bdpt.h \
-    util/sampleinfo.h
+    util/sampleinfo.h \
+    denoiser/denoiser.h

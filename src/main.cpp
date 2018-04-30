@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 
     std::cout << "Loaded program with section: " << section_id << " (max " << sections << ")" << std::endl;
 
-    QImage image(IMAGE_WIDTH, adjusted_image_height, QImage::Format_RGB32);
+//    QImage image(IMAGE_WIDTH, adjusted_image_height, QImage::Format_RGB32);
 
     Scene *scene;
     if(!Scene::load(scenefile, &scene)) {
@@ -62,21 +62,21 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, adjusted_image_height, section_id);
+    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, adjusted_image_height, section_id, output);
 
-    QRgb *data = reinterpret_cast<QRgb *>(image.bits());
+//    QRgb *data = reinterpret_cast<QRgb *>(image.bits());
 
-    tracer.traceScene(data, *scene);
+    tracer.traceScene(*scene);
     delete scene;
 
-    bool success = image.save(output);
-    if(!success) {
-        success = image.save(output, "PNG");
-    }
-    if(success) {
-        std::cout << "Wrote rendered image to " << output.toStdString() << std::endl;
-    } else {
-        std::cerr << "Error: failed to write image to " << output.toStdString() << std::endl;
-    }
+//    bool success = image.save(output);
+//    if(!success) {
+//        success = image.save(output, "PNG");
+//    }
+//    if(success) {
+//        std::cout << "Wrote rendered image to " << output.toStdString() << std::endl;
+//    } else {
+//        std::cerr << "Error: failed to write image to " << output.toStdString() << std::endl;
+//    }
     a.exit();
 }

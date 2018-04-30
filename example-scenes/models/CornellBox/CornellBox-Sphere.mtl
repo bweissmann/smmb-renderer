@@ -16,11 +16,11 @@
 newmtl leftSphere
     Ka 0.01 0.01 0.01
     Kd 0.01 0.51 0.01
-    Ks 0 0 0
-    #Ks 0.95 0.95 0.95
+    #Ks 0 0 0
+    Ks 0.95 0.95 0.95
     # Tf 0.10 0.10 0.10
     Ni 1.5
-    Ns 5
+    Ns 50
     illum 5
 
 newmtl rightSphere
@@ -50,8 +50,8 @@ newmtl ceiling
     illum 2
     Ka 0.7100 0.7100 0.7100
     Kd 0.9000 0.9000 0.9000
-    #Ks 0.0000 0.0000 0.0000
-    Ks 0.9000 0.9000 0.9000
+    Ks 0.0000 0.0000 0.0000
+    #Ks 0.9000 0.9000 0.9000
     Ns 1000
 
 newmtl backWall

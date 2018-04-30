@@ -15,14 +15,14 @@
 
 using namespace Eigen;
 
-PathTracer::PathTracer(int width, int image_height, int output_height, int section_id)
-    : m_width(width), m_image_height(image_height), m_output_height(output_height), m_section_id(section_id)
+PathTracer::PathTracer(int width, int image_height, int output_height, int section_id, QString name)
+    : m_width(width), m_image_height(image_height), m_output_height(output_height), m_section_id(section_id), m_name(name), m_denoiser(m_width, m_image_height, 17, m_name)
 {
 }
 
-void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
+void PathTracer::traceScene(const Scene& scene)
 {
-    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
+//    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
     PixelInfo pixelInfo[m_width * m_output_height];
 
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
@@ -64,9 +64,22 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     }
 
     if (!should_denoise) {
-        toneMap(imageData, pixelInfo);
+        QImage image(m_width, m_output_height, QImage::Format_RGB32);
+        QRgb *data = reinterpret_cast<QRgb *>(image.bits());
+        toneMap(data, pixelInfo);
+        bool success = image.save(m_name + ".png");
+        if(!success) {
+            success = image.save(m_name + ".png", "PNG");
+        }
+        if(success) {
+            std::cout << "Wrote rendered image to " << (m_name + "-" + ".png").toStdString() << std::endl;
+        } else {
+            std::cerr << "Error: failed to write image to " << (m_name + ".png").toStdString() << std::endl;
+        }
     } else {
         //TODO:: call denoise function here
+        m_denoiser.init(pixelInfo);
+        m_denoiser.run();
     }
 }
 
@@ -80,6 +93,7 @@ void PathTracer::tracePixelPT(int output_x, int output_y, const Scene& scene,
     Vector3f output_radience = Vector3f::Zero();
     Vector3f eye_center(0, 0, 0);
 
+    PixelInfo info = PixelInfo(M_NUM_SAMPLES);
     for (int i = 0; i < M_NUM_SAMPLES; i++) {
         /* Sample an x and y randomly within the sensor square */
         float x = pixel_x + MathUtils::random() - 0.5f;
@@ -92,9 +106,13 @@ void PathTracer::tracePixelPT(int output_x, int output_y, const Scene& scene,
         const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
         const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
 
-        output_radience += traceRay(world_camera_space_ray, scene, 0);
+//        output_radience += traceRay(world_camera_space_ray, scene, 0);
+
+        info.samplesPerPixel[i].sample_radiance = traceRay(world_camera_space_ray, scene, 0);
+        output_radience += info.samplesPerPixel[i].sample_radiance;
     }
-    pixelInfo[output_index].radiance = output_radience / M_NUM_SAMPLES;
+    info.radiance = output_radience / M_NUM_SAMPLES;
+    pixelInfo[output_index] = info;
 }
 
 Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
@@ -109,11 +127,12 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         const tinyobj::real_t *e = mat.emission; //Emitted color
         const Vector3f normal = t->getNormal(i); //surface normal
 
+
+
         // Ignore all Emitted Light
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0 ) {
-//            if (normal.dot(ray.d) < 0 && depth == 0) {
-              if (normal.dot(ray.d) < 0) {
+            if (normal.dot(ray.d) < 0 && depth == 0) {
                 return emitted_light;
             } else {
                 return Vector3f(0.f, 0.f, 0.f);
@@ -123,8 +142,6 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         MaterialType type = BSDF::getType(mat);
 
         //just return it up here
-        return Vector3f(mat.diffuse[0], mat.diffuse[1], mat.diffuse[2]);
-
         float schlick = 1.f;
 
         // If the cos_theta_squared term is negative or based on schlick's probability, then
@@ -247,7 +264,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
     Vector3f output_radience = Vector3f::Zero();
     Vector3f eye_center(0, 0, 0);
     Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
-    PixelInfo total_info = PixelInfo(0);
+    PixelInfo total_info = PixelInfo(M_NUM_SAMPLES);
     for (int i = 0; i < M_NUM_SAMPLES; i++) {
 
         /* Sample an x and y randomly within the sensor square */
@@ -277,7 +294,6 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         tracePath(ray_info.ray, scene, 0, light_path, Vector3f(1, 1, 1));
 
         if (eye_path.size() == 1) {
-            total_info.addEmptySample();
             continue;
         }
 
@@ -289,12 +305,13 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 
         size = light_path.size() * (eye_path.size() - 1);
         PixelInfo pixelInfo = PixelInfo(light_path.size() * (eye_path.size() - 1));
-        BDPT::combinePaths2(scene, eye_path, light_path, pixelInfo);
+        BDPT::combinePaths2(scene, eye_path, light_path, pixelInfo, invViewMatrix);
 
-        total_info.addInfo(pixelInfo);
+        total_info.samplesPerPixel[i].sample_radiance = pixelInfo.radiance;
         output_radience += pixelInfo.radiance;
       }
-    total_info.radiance /= M_NUM_SAMPLES;
+    total_info.radiance =  output_radience / M_NUM_SAMPLES;
+
     pixelInfo[output_index] = total_info;
 }
 

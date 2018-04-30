@@ -20,7 +20,7 @@ class BDPT
 public:
     BDPT();
 
-    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info);
+    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info, const Eigen::Matrix4f &invViewMatrix);
 
     static bool isVisible(const Scene&scene, const Eigen::Vector3f &position1, const Eigen::Vector3f &position2);
 

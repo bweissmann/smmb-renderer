@@ -9,7 +9,7 @@ BDPT::BDPT() {
 
 }
 
-void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info) {
+void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info, const Matrix4f &invViewMatrix) {
 
     //compute closest one and normal
     Vector3f normal = eye_path[1].surface_normal;
@@ -25,7 +25,7 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
             color = Vector3f(eye_path[1].mat.specular[0], eye_path[1].mat.specular[2], eye_path[1].mat.specular[2]);
         }
     }
-    float depth = (eye_path[1].position - eye_path[2].position).norm();
+    float depth = (eye_path[1].position - (Affine3f)invViewMatrix * eye_path[0].position).norm();
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
     int index = 0;

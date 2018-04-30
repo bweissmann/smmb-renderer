@@ -7,6 +7,7 @@
 #include "bsdf.h"
 #include "util/pathnode.h"
 #include "util/sampleinfo.h"
+#include "denoiser/denoiser.h"
 
 enum RenderType {
     PATH_TRACING,
@@ -16,8 +17,8 @@ enum RenderType {
 class PathTracer
 {
 public:
-    PathTracer(int width, int image_height, int output_height, int section_id);
-    void traceScene(QRgb *imageData, const Scene &scene);
+    PathTracer(int width, int image_height, int output_height, int section_id, QString name);
+    void traceScene(const Scene &scene);
     void tracePixelPT(int pixel_x, int pixel_y, const Scene& scene,
                     PixelInfo *pixelInfo, const Eigen::Matrix4f &invViewMatrix);
     void tracePixelBD(int output_x, int output_y, const Scene& scene,
@@ -27,19 +28,23 @@ public:
     static float getContinueProbability(Eigen::Vector3f brdf);
 
 private:
+
     int m_width, m_image_height, m_output_height, m_section_id;
 
+    QString m_name;
+    Denoiser m_denoiser;
+
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 400;
+    const int M_NUM_SAMPLES = 50;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
     /* Indicates if image should be denoised or tone-mapped */
-    bool should_denoise = false;
+    bool should_denoise = true;
 
-    const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
+    const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
 
     void toneMap(QRgb *imageData, PixelInfo *pixelInfo);
 
