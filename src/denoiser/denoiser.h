@@ -51,6 +51,8 @@ private:
     void squaredDifference(float a, float b, float *difference);
     void ratioValues(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f c, Eigen::Vector3f *ratio);
     void ratioValues(float a, float b, float c, float *ratio);
+    template <class T>
+    void filterWithWeights(int c_r, T *in, T *out, float** weights, T init);
     void saveImage(Eigen::Vector3f *buf, QString nameMod);
     void saveImage(float *buf, QString nameMod);
     void saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod);

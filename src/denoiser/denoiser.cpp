@@ -320,15 +320,12 @@ void Denoiser::prefilterFeatures() {
     NL_means_filter(c_r, c_f, c_k, depth_vec, nullptr, depth_var, depth_prefilter_weights, true);
     std::cout << "Depths done" << std::endl;
     // filter the A and B dual buffers with these weights
-    for (int i = 0; i < pixels; i++) {
-        int row, col;
-        getCoords(i, m_width, &row, &col);
-        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
-            for (int row_N = row + c_r; row_N <= row + c_r; row_N++) {
-                if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
-            }
-        }
-    }
+    filterWithWeights(c_r, m_colourValuesA, m_colourValuesA, colour_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
+    filterWithWeights(c_r, m_colourValuesB, m_colourValuesB, colour_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
+    filterWithWeights(c_r, m_normalValuesA, m_normalValuesA, normal_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
+    filterWithWeights(c_r, m_normalValuesB, m_normalValuesB, normal_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
+    filterWithWeights(c_r, m_depthValuesA, m_depthValuesA, depth_prefilter_weights, 0.f);
+    filterWithWeights(c_r, m_depthValuesB, m_depthValuesB, depth_prefilter_weights, 0.f);
 }
 
 
@@ -646,6 +643,31 @@ void Denoiser::saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod) {
         std::cout << "Wrote rendered image to " << (m_name + "-" + nameMod + ".png").toStdString() << std::endl;
     } else {
         std::cerr << "Error: failed to write image to " << (m_name + "-" + nameMod + ".png").toStdString() << std::endl;
+    }
+}
+
+template <class T>
+void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init) {
+    int pixels = m_height * m_width;
+    T temp[pixels];
+    for (int i = 0; i < pixels; i++) {
+        int row, col;
+        getCoords(i, m_width, &row, &col);
+        float weight_total = 0.f;
+        T accumulator = init;
+        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
+            for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
+                if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
+                int neighbourhood_index = getIndex((2 * c_r) + 1, row_N - (row - c_r), col_N - (col - c_r));
+                int image_index = getIndex(m_width, row_N, col_N);
+                weight_total += weights[i][neighbourhood_index];
+                accumulator += weights[i][neighbourhood_index] * in[image_index];
+            }
+        }
+        temp[i] = accumulator / weight_total;
+    }
+    for (int i = 0; i < pixels; i++) {
+        out[i] = temp[i];
     }
 }
 
