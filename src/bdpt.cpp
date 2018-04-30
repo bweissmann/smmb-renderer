@@ -35,6 +35,9 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
             if (eye_path.size() == 2) {
                 weight = 1.f;
             }
+            //TEMP
+//            weight = 1.f;
+            //ENDTEMP
             Vector3f weighted_contrib = eye_path[i].contrib * weight;
             info.samplesPerPixel[index].sample_radiance = weighted_contrib;
             info.samplesPerPixel[index].sample_color = color;
@@ -45,6 +48,9 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
             continue;
          }
         for (int j = 0; j < num_light_nodes; j++) {
+            //TEMP
+//            break;
+            //ENDTEMP
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
 
