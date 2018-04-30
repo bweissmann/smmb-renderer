@@ -63,7 +63,6 @@ void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_pa
     }
 }
 
-
 BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
     BDPT_Samples samples = BDPT_Samples();
     int num_eye_nodes = eye_path.size();
@@ -247,7 +246,6 @@ float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f 
     return output;
 }
 
-//TODO:: compute path weights
 float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                  int max_eye_index, int max_light_index) {
     float true_prob = computePathProbability(eye_path, light_path, max_eye_index, max_light_index);
@@ -278,89 +276,6 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
     return isnan(output) ? 0.f : output;
 }
 
-
-//float BDPT::computePathWeight2(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
-//                              int max_eye_index, int max_light_index) {
-
-//    float true_prob = computePathProbability(eye_path, light_path, max_eye_index, max_light_index);
-//    int n = max_eye_index + max_light_index + 2;
-//    if (true_prob < 1e-8) {
-//        return 0.f;
-//    }
-//    std::vector<PathNode> c_eye_path;
-//    std::vector<PathNode> c_light_path;
-//    //adds everything to light path
-//    for (int i = 0; i <= max_light_index; i++) {
-//        c_light_path.push_back(light_path[i]);
-//    }
-//    for (int i = max_eye_index; i >= 0; i--) {
-//        c_light_path.push_back(eye_path[i]);
-//    }
-//    for (int i = 0; i < n; i++) {
-//        c_eye_path.push_back(c_light_path[n - i - 1]);
-//    }
-//    float sum = 1.f;
-//    float original_prob = 1.f;
-//    int size = c_light_path.size();
-
-
-//    if (max_eye_index < size - 1) {
-//        original_prob = threePointProbability(c_eye_path[max_eye_index - 1], c_eye_path[max_eye_index],
-//                c_eye_path[max_eye_index + 1]);
-//    } else {
-//        original_prob = twoPointProbability(c_eye_path[max_eye_index - 1], c_eye_path[max_eye_index]);
-//    }
-
-////    if (max_eye_index > 1) {
-////        original_prob = threePointProbability(c_eye_path[max_eye_index], c_eye_path[max_eye_index - 1],
-////                c_eye_path[max_eye_index - 2]);
-////    } else {
-////        original_prob = twoPointProbability(c_eye_path[max_eye_index], c_eye_path[max_eye_index]);
-////    }
-//    float top_prob = original_prob;
-//    float mult_prob = 1.f;
-
-//    //considers cases where light path is longer
-//    for (int i = max_eye_index; i >= 2; i--) {
-//        PathNode max_light_node = c_eye_path[i];
-//        float denominator = 1.f;
-
-
-//        if (i == size - 1) {
-//            top_prob = max_light_node.point_prob;
-//        } else {
-//            if (i < size - 2) {
-//                top_prob = threePointProbability(max_light_node, c_eye_path[i + 1], c_eye_path[i + 2]);
-//            } else {
-//                top_prob = twoPointProbability(max_light_node, c_eye_path[i + 1]);
-//            }
-//        }
-//        float ratio = top_prob / denominator;
-//        mult_prob = mult_prob * ratio;
-//        sum += powf(mult_prob, 2);
-//        denominator = top_prob;
-//    }
-//    mult_prob = 1.f;
-//    if (max_light_index == 0) {
-//        denominator = c_light_path[max_light_index].point_prob;
-//    } else if (max_light_index == 1) {
-//        denominator = twoPointProbability(c_light_path[max_light_index], c_light_path[max_eye_index - 1]);
-//    } else {
-//        denominator = threePointProbability(c_light_path[max_eye_index], c_light_path[max_eye_index - 1], c_light_path[max_eye_index  - 2]);
-//    }
-
-//    //eye path ended at max_light  index
-//    for (int i = max_light_index; i >= 0; i--) {
-//        PathNode max_eye_node = c_light_path[i];
-//        float top_prob = threePointProbability(max_eye_node, c_light_path[i + 1], c_light_oath[i + 2]);
-//        float ratio = top_prob / denominator;
-//        mult_prob = mult_prob * ratio;
-//        sum += powf(mult_prob, 2);
-//        denominator = top_prob;
-//    }
-//}
-
-
 float BDPT::threePointProbability(const PathNode &point, const PathNode &pointFrom, const PathNode &prior) {
     Vector3f outgoing = (point.position - pointFrom.position).normalized();
     Vector3f incoming = (pointFrom.position - prior.position).normalized();
@@ -369,7 +284,6 @@ float BDPT::threePointProbability(const PathNode &point, const PathNode &pointFr
     float cosine_theta = fabsf(pointFrom.surface_normal.dot(outgoing));
     return brdf_prob * throughput / cosine_theta;
 }
-
 
 float BDPT::twoPointProbability(const PathNode &point, const PathNode &pointFrom) {
     Vector3f outgoing = (point.position - pointFrom.position).normalized();
