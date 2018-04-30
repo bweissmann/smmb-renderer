@@ -31,6 +31,7 @@ MaterialType BSDF::getType(const tinyobj::material_t& mat) {
     Vector3f specular(mat.specular[0], mat.specular[1], mat.specular[2]);
     Vector3f transmittance(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
 
+    return IDEAL_DIFFUSE;
     if (transmittance.norm() > 0.1) {
         return REFRACTION;
     } else if (specular.norm() < DIFFUSE_CUTOFF) {

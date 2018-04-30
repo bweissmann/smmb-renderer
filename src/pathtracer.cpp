@@ -28,7 +28,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     threads.resize(m_width * m_output_height);
 
     // Setup intensity values and logging
-    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
+    Vector3f *intensityValues = new Vector3f[m_width * m_output_height]; // Init intensity values
     StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
 
