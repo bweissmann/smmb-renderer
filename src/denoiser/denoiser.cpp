@@ -27,14 +27,44 @@ Denoiser::~Denoiser() {
 
 void Denoiser::init(Eigen::Vector3f *intensityValues, int *numSamples,
                     Eigen::Vector3f **samples, Eigen::Vector3f **colours,
-                    Eigen::Vector3f **normals, float** depths, QRgb *imageData) {
+                    Eigen::Vector3f **normals, float** depths) {
+    // if our monte carlo renderer returns the six basic sets of data, we simply set
+    // our pointers to point to them.
     m_intensityValues = intensityValues;
     m_numSamples = numSamples;
     m_samples = samples;
     m_colours = colours;
     m_normals = normals;
     m_depths = depths;
-    m_imageData = imageData;
+}
+
+void Denoiser::init(std::vector<PixelInfo> &pixelInfos) {
+    // if we get give a pixel info vector instead, then we need to decompose it into
+    // the six basic sets of data. Our denoising functions operate on arrays of vectors or
+    // arrays of floats only, so decomposing our data as such helps us write cleaner and
+    // more abstract code.
+    int num_pixels = m_width * m_height;
+    m_intensityValues = new Eigen::Vector3f[num_pixels];
+    m_numSamples = new int[num_pixels];
+    m_samples = new Eigen::Vector3f*[num_pixels];
+    m_colours = new Eigen::Vector3f*[num_pixels];
+    m_normals = new Eigen::Vector3f*[num_pixels];
+    m_depths = new float*[num_pixels];
+    for (int i = 0; i < num_pixels; i++) {
+        m_intensityValues[i] = pixelInfos[i].radiance;
+        int num_samples = pixelInfos[i].num_samples;
+        m_numSamples[i] = num_samples;
+        m_samples[i] = new Eigen::Vector3f[num_samples];
+        m_colours[i] = new Eigen::Vector3f[num_samples];
+        m_normals[i] = new Eigen::Vector3f[num_samples];
+        m_depths[i] = new float[num_samples];
+        for (int j = 0; j < num_samples; j++) {
+            m_samples[i][j] = pixelInfos[i].samplesPerPixel[j].sample_radiance;
+            m_colours[i][j] = pixelInfos[i].samplesPerPixel[j].sample_color;
+            m_normals[i][j] = pixelInfos[i].samplesPerPixel[j].sample_normal;
+            m_depths[i][j] = pixelInfos[i].samplesPerPixel[j].sample_depth;
+        }
+    }
 }
 
 void Denoiser::run() {
@@ -87,7 +117,7 @@ void Denoiser::run() {
 
 
     // post-processing
-    toneMap(m_intensityValues, m_imageData);
+    saveImage(m_intensityValues, "denoised");
 }
 
 
@@ -232,7 +262,7 @@ void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, 
         T buffer_filter_value = init;
         int normalizer = ((2 * r) + 1) * ((2 * r) + 1);
         int row_centre, col_centre;
-        getCoords(i, m_width, m_height, &row_centre, &col_centre);
+        getCoords(i, m_width, &row_centre, &col_centre);
         for (int col = col_centre - r; col <= col_centre + r; col++) {
             for (int row = row_centre - r; row <= row_centre + r; row++) {
                 if (outOfBufferBounds(m_width, m_height, row, col)) {
@@ -268,6 +298,9 @@ void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, 
 // prefiltering for the feature buffers
 void Denoiser::prefilterFeatures() {
     std::cout << "Prefiltering features..." << std::endl;
+    int c_r = 5;
+    int c_f = 3;
+    int c_k = 1.f;
     int pixels = m_height * m_width;
     float** colour_prefilter_weights = new float*[pixels];
     float** normal_prefilter_weights = new float*[pixels];
@@ -280,12 +313,22 @@ void Denoiser::prefilterFeatures() {
         depth_var[i] = Eigen::Vector3f(m_depth_variances[i], m_depth_variances[i], m_depth_variances[i]);
     }
     // get the weights for everyone
-    NL_means_filter(5, 3, 1.f, m_colourValues, nullptr, m_colour_variances, colour_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, m_colourValues, nullptr, m_colour_variances, colour_prefilter_weights, true);
     std::cout << "Colours done" << std::endl;
-    NL_means_filter(5, 3, 1.f, m_normalValues, nullptr, m_normal_variances, normal_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, m_normalValues, nullptr, m_normal_variances, normal_prefilter_weights, true);
     std::cout << "Normals done" << std::endl;
-    NL_means_filter(5, 3, 1.f, depth_vec, nullptr, depth_var, depth_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, depth_vec, nullptr, depth_var, depth_prefilter_weights, true);
     std::cout << "Depths done" << std::endl;
+    // filter the A and B dual buffers with these weights
+    for (int i = 0; i < pixels; i++) {
+        int row, col;
+        getCoords(i, m_width, &row, &col);
+        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
+            for (int row_N = row + c_r; row_N <= row + c_r; row_N++) {
+                if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
+            }
+        }
+    }
 }
 
 
@@ -325,8 +368,8 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
         }
         float C = 0.f; // running total of the neigbour weights
         int row, col;
+        getCoords(pixel, m_width, &row, &col); // get the current coordinate
         std::cout << col  << ", " << row << std::endl;
-        getCoords(pixel, m_width, m_height, &row, &col); // get the current coordinate
         // we can get the centre patch at this point. It does not change.
         for (int col_P = col - c_f; col_P <= col + c_f; col_P++) { // FOR EACH PIXEL
             for (int row_P = row - c_f; row_P <= row + c_f; row_P++) { // IN CENTRE PATCH
@@ -484,7 +527,7 @@ int Denoiser::getIndex(int cols, int row, int col) {
     return cols * row + col;
 }
 
-void Denoiser::getCoords(int index, int rows, int cols, int* row, int* col) {
+void Denoiser::getCoords(int index, int cols, int* row, int* col) {
     *col = index % cols;
     *row = index / cols;
 }
@@ -589,11 +632,11 @@ void Denoiser::saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod) {
     int num_pixels = m_width * m_height;
     for (int i = 0; i < num_pixels; i++) {
         int x, y;
-        getCoords(i, m_width, m_height, &x, &y);
+        getCoords(i, m_width, &x, &y);
         data[i] = qRgb(buf[i].x(), buf[i].y(), buf[i].z());
         std::cout << "Coord: " << x << ", " << y << std::endl;
         std::cout << buf[i].x() << " " << buf[i].y() << " " << buf[i].z() << std::endl;
-        std::cout << ((data[i] && 0x00FF0000) >> 16) << " " << ((data[i] && 0x0000FF00) >> 8) << " " << (data[i] && 0x000000FF) << std::endl;
+        std::cout << ((data[i] & 0x00FF0000) >> 16) << " " << ((data[i] & 0x0000FF00) >> 8) << " " << (data[i] & 0x000000FF) << std::endl;
     }
     bool success = image.save(m_name + "-" + nameMod + ".png");
     if(!success) {
@@ -643,7 +686,7 @@ void Denoiser::filterBufferVariances_RKZ12() {
     for (int i = 0; i < num_pixels; i++) {
         // for each pixel in the region we filter within (2r + 1 x 2r + 1), we need to compute NL-means weights
         int row, col;
-        getCoords(i, m_width, m_height, &row, &col);
+        getCoords(i, m_width, &row, &col);
         // get centre patch samples (these don't change)
         for (int j = col - f; j <= col + f; j++) {
             for (int k = row - f; k <= row + f; k++) {

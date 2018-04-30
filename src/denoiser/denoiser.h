@@ -4,6 +4,7 @@
 #include <QImage>
 #include <Eigen/Dense>
 #include <iostream>
+#include "util/sampleinfo.h"
 
 /** Top class for the Denoiser
  * Interface
@@ -16,25 +17,12 @@
 
 class Denoiser {
 public:
-
-    // UNUSED, CAN IGNORE
-    struct PixelInfo {
-        int num_samples;
-        Eigen::Vector3f* samples;
-        Eigen::Vector3f colour;
-        Eigen::Vector3f normal;
-        float depth;
-        Eigen::Vector3f sample_variance;
-        Eigen::Vector3f colour_variance;
-        Eigen::Vector3f normal_variance;
-        float depth_variance;
-    };
-
     Denoiser(int width, int height, int radius, QString name);
     ~Denoiser();
     void init(Eigen::Vector3f *intensityValues, int *numSamples,
               Eigen::Vector3f **samples, Eigen::Vector3f **colours,
-              Eigen::Vector3f **normals, float** depths, QRgb *imageData);
+              Eigen::Vector3f **normals, float** depths);
+    void init(std::vector<PixelInfo>& pixelInfos);
     void run();
 
 private:
@@ -45,7 +33,7 @@ private:
     void splitIntoBuffers();
     void calculateVariances();
     int getIndex(int cols, int row, int col);
-    void getCoords(int index, int X, int cols, int* row, int* col);
+    void getCoords(int index, int cols, int* row, int* col);
     bool outOfBufferBounds(int X, int Y, int x, int y);
     void filterBufferVariances_RKZ12();
     template <class T>
@@ -87,7 +75,6 @@ private:
     Eigen::Vector3f **m_normals;
     float *m_depthValues;
     float **m_depths;
-    QRgb *m_imageData;
     Eigen::Affine3f m_invViewMatrix;
 
     // buffer A
