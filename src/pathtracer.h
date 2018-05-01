@@ -35,7 +35,7 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 1000;
+    const int M_NUM_SAMPLES = 10;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
