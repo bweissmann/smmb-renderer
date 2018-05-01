@@ -261,7 +261,6 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
     int pixel_y = output_y + m_section_id * m_output_height;
     int output_index = output_x + output_y * m_width;
 
-    Vector3f output_radience = Vector3f::Zero();
     Vector3f eye_center(0, 0, 0);
     Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
     PixelInfo total_info = PixelInfo(M_NUM_SAMPLES);
@@ -293,6 +292,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         tracePath(world_camera_space_ray, scene, 0, eye_path, Vector3f(1, 1, 1));
         tracePath(ray_info.ray, scene, 0, light_path, Vector3f(1, 1, 1));
 
+        //the eye path contains only the eye node
         if (eye_path.size() == 1) {
             continue;
         }
@@ -304,56 +304,33 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         }
 
         size = light_path.size() * (eye_path.size() - 1);
-        PixelInfo pixelInfo = PixelInfo(light_path.size() * (eye_path.size() - 1));
-        BDPT::combinePaths2(scene, eye_path, light_path, pixelInfo, invViewMatrix);
+        SampleInfo sampleInfo = SampleInfo();
 
-        total_info.samplesPerPixel[i].sample_radiance = pixelInfo.radiance;
-        output_radience += pixelInfo.radiance;
+        //fills in sample_radiance in sampleInfo
+        BDPT::combinePaths(scene, eye_path, light_path, sampleInfo);
+
+        //get normal, depth, color for denoising information
+        sampleInfo.sample_normal = eye_path[1].surface_normal;
+        Vector3f emitted(eye_path[1].mat.emission[0], eye_path[1].mat.emission[2], eye_path[1].mat.emission[2]);
+        if (emitted.norm() > 0) {
+            sampleInfo.sample_color = emitted;
+        } else {
+            if (eye_path[1].type == IDEAL_DIFFUSE) {
+                sampleInfo.sample_color = Vector3f(eye_path[1].mat.diffuse[0], eye_path[1].mat.diffuse[2], eye_path[1].mat.diffuse[2]);
+            } else {
+                sampleInfo.sample_color = Vector3f(eye_path[1].mat.specular[0], eye_path[1].mat.specular[2], eye_path[1].mat.specular[2]);
+            }
+        }
+        sampleInfo.sample_depth = (eye_path[1].position - (Affine3f)invViewMatrix * eye_path[0].position).norm();
+        total_info.samplesPerPixel[i] = sampleInfo;
+        total_info.radiance += sampleInfo.sample_radiance;
       }
-    total_info.radiance =  output_radience / M_NUM_SAMPLES;
-
+    total_info.radiance /= M_NUM_SAMPLES;
     pixelInfo[output_index] = total_info;
 }
 
-//Refraction not considered in trace path yet
-void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &pathNodes, bool lightPath) {
-    IntersectionInfo i;
 
-    if(scene.getBVH().getIntersection(ray, &i, false)) {
-        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
-        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
-        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
-        const tinyobj::real_t *e = mat.emission; //Emitted color
-        const Vector3f normal = t->getNormal(i); //surface normal
-
-        // Ignore all Emitted Light
-        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
-        if (emitted_light.norm() > 0) {
-            Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1.f / (2.f * M_PI), 1);
-            pathNodes.push_back(node);
-            return;
-        }
-
-        MaterialType type = BSDF::getType(mat);
-        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
-        const Ray next_ray = next_ray_info.ray;
-        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
-        float pdf_rr = getContinueProbability(brdf);
-
-        if (MathUtils::random() < pdf_rr) {
-            Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, pdf_rr * next_ray_info.prob, 0);
-            pathNodes.push_back(node);
-            tracePath(next_ray, scene, depth + 1, pathNodes, lightPath);
-        } else {
-            Vector3f N = ray.is_in_air ? normal : -normal;
-            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, (1 - pdf_rr), 0);
-            pathNodes.push_back(node);
-        }
-    }
-}
-
+//THIS IS THE UPDATED TACE PATH FUNCTION THAT PRECOMPUTES RADIANCE AT EACH NODE
 void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &nodes, const Vector3f &prev_brdf) {
     IntersectionInfo i;
     if (scene.getBVH().getIntersection(ray, &i, false)) {
@@ -406,6 +383,45 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             Vector3f N = ray.is_in_air ? normal : -normal;
             PathNode node(ray, contrib, next_ray.o, N, type, mat, true, 1.f, (1 - pdf_rr), 0);
             nodes.push_back(node);
+        }
+    }
+}
+
+//THIS IS AN OLD TRACE PATH FUNCTION
+void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &pathNodes, bool lightPath) {
+    IntersectionInfo i;
+
+    if(scene.getBVH().getIntersection(ray, &i, false)) {
+        const Mesh * m = static_cast<const Mesh *>(i.object);//Get the mesh that was intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        const tinyobj::material_t& mat = m->getMaterial(t->getIndex());//Get the material of the triangle from the mesh
+        const tinyobj::real_t *e = mat.emission; //Emitted color
+        const Vector3f normal = t->getNormal(i); //surface normal
+
+        // Ignore all Emitted Light
+        const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
+        if (emitted_light.norm() > 0) {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(i.hit, N,  Vector3f(1, 1, 1), emitted_light, ray, LIGHT, mat, 1.f / (2.f * M_PI), 1);
+            pathNodes.push_back(node);
+            return;
+        }
+
+        MaterialType type = BSDF::getType(mat);
+        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        const Ray next_ray = next_ray_info.ray;
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+        float pdf_rr = getContinueProbability(brdf);
+
+        if (MathUtils::random() < pdf_rr) {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, pdf_rr * next_ray_info.prob, 0);
+            pathNodes.push_back(node);
+            tracePath(next_ray, scene, depth + 1, pathNodes, lightPath);
+        } else {
+            Vector3f N = ray.is_in_air ? normal : -normal;
+            PathNode node(next_ray.o, N, brdf, Vector3f(0, 0, 0), next_ray, type, mat, (1 - pdf_rr), 0);
+            pathNodes.push_back(node);
         }
     }
 }

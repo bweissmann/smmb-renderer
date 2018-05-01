@@ -6,29 +6,15 @@
 #include "scene/scene.h"
 #include "util/sampleinfo.h"
 
-struct BDPT_Samples {
-
-    BDPT_Samples() : contrib(Eigen::Vector3f(0, 0, 0)), num_samples(0) {}
-
-    Eigen::Vector3f contrib;
-    int num_samples;
-};
-
-
 class BDPT
 {
 public:
     BDPT();
 
-    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info, const Eigen::Matrix4f &invViewMatrix);
 
-    static void combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info, const Eigen::Matrix4f &invViewMatrix);
-
-
+    static void combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info);
     static bool isVisible(const Scene&scene, const Eigen::Vector3f &position1, const Eigen::Vector3f &position2);
 
-
-    static BDPT_Samples combinePaths(const Scene&scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path);
     static Eigen::Vector3f computeContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, int max_eye_index, int max_light_index);
     static Eigen::Vector3f computeZeroBounceContrib(const PathNode &eye, const PathNode &light);
     static Eigen::Vector3f computePathTracingContrib(const std::vector<PathNode> &eye_path,  const PathNode &light, int max_eye_index);

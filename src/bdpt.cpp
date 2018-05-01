@@ -9,91 +9,28 @@ BDPT::BDPT() {
 
 }
 
-void BDPT::combinePaths2(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, PixelInfo &info, const Matrix4f &invViewMatrix) {
-
-    //compute closest one and normal
-    Vector3f normal = eye_path[1].surface_normal;
-
-    Vector3f color;
-    Vector3f emitted(eye_path[1].mat.emission[0], eye_path[1].mat.emission[2], eye_path[1].mat.emission[2]);
-    if (emitted.norm() > 0) {
-        color = emitted;
-    } else {
-        if (eye_path[1].type == IDEAL_DIFFUSE) {
-            color = Vector3f(eye_path[1].mat.diffuse[0], eye_path[1].mat.diffuse[2], eye_path[1].mat.diffuse[2]);
-        } else {
-            color = Vector3f(eye_path[1].mat.specular[0], eye_path[1].mat.specular[2], eye_path[1].mat.specular[2]);
-        }
-    }
-    float depth = (eye_path[1].position - (Affine3f)invViewMatrix * eye_path[0].position).norm();
+void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info) { /*PixelInfo &info, const Matrix4f &invViewMatrix) {*/
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
-    int index = 0;
     for (int i = 1; i < num_eye_nodes; i++) {
         if (eye_path[i].type == LIGHT) {
             float weight = computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
             if (eye_path.size() == 2) {
                 weight = 1.f;
             }
-            //TEMP
-//            weight = 1.f;
-            //ENDTEMP
             Vector3f weighted_contrib = eye_path[i].contrib * weight;
-            info.samplesPerPixel[index].sample_radiance = weighted_contrib;
-            info.samplesPerPixel[index].sample_color = color;
-            info.samplesPerPixel[index].sample_normal = normal;
-            info.samplesPerPixel[index].sample_depth = depth;
-            info.radiance += weighted_contrib;
-            index++;
+            info.sample_radiance += weighted_contrib;
             continue;
          }
         for (int j = 0; j < num_light_nodes; j++) {
-            //TEMP
-//            break;
-            //ENDTEMP
             if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
-
                 float weight = computePathWeight(eye_path, light_path, i, j);
                 Vector3f weighted_contrib = contrib * weight;
-
-
-                info.samplesPerPixel[index].sample_radiance = weighted_contrib;
-                info.samplesPerPixel[index].sample_color = color;
-                info.samplesPerPixel[index].sample_normal = normal;
-                info.samplesPerPixel[index].sample_depth = depth;
-                info.radiance += weighted_contrib;
+                info.sample_radiance += weighted_contrib;
             }
-            index++;
         }
     }
-}
-
-BDPT_Samples BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path) {
-    BDPT_Samples samples = BDPT_Samples();
-    int num_eye_nodes = eye_path.size();
-    int num_light_nodes = light_path.size();
-    samples.num_samples = 0;
-    for (int i = 1; i < num_eye_nodes; i++) {
-        if (eye_path[i].type == LIGHT) {
-            float weight = computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
-            if (eye_path.size() == 2) {
-                weight = 1.f;
-            }
-            samples.contrib += eye_path[i].contrib * weight;
-            samples.num_samples++;
-            continue;
-         }
-        for (int j = 0; j < num_light_nodes; j++) {
-            if (BDPT::isVisible(scene, eye_path[i].position, light_path[j].position)) {
-                Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
-                float weight = computePathWeight(eye_path, light_path, i, j);
-                samples.contrib += contrib * weight;
-            }
-            samples.num_samples++;
-        }
-    }
-    return samples;
 }
 
 /**
