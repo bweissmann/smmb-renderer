@@ -3,6 +3,7 @@
 
 #include <BVH/Ray.h>
 #include "bsdf.h"
+#include "scene/scene.h"
 
 /** an object to return a ray and the probability of choosing that ray */
 struct SampledRayInfo {
@@ -19,7 +20,12 @@ public:
     SampleRay();
 
     static SampledRayInfo sampleRay(const MaterialType type, const Eigen::Vector3f &position, const Ray &incoming_ray,
-                                        const Eigen::Vector3f &surface_normal, const tinyobj::material_t& mat);
+                                        const Eigen::Vector3f &surface_normal, const tinyobj::material_t& mat, const Scene &scene);
+
+
+    static SampledRayInfo scattering(const Eigen::Vector3f &position, const Ray &incoming_ray,
+                                     const Eigen::Vector3f &surface_normal, const tinyobj::material_t &mat, const Scene &scene);
+
 
     static SampledRayInfo uniformSampleHemisphere(const Eigen::Vector3f &position, const Ray &incoming_ray,
                                                   const Eigen::Vector3f &surface_normal);
@@ -40,9 +46,11 @@ public:
 
     static float refractionGetAngleSquared(const Ray &incoming_ray, const Eigen::Vector3f &surface_normal,
                                     const tinyobj::material_t& mat);
+    static Eigen::Vector3f tangentToWorldSpaceNotNormalized(const Eigen::Vector3f &surface_normal, const Eigen::Vector3f &tangentspace_direction);
 
 private:
     static Eigen::Vector3f tangentToWorldSpace(const Eigen::Vector3f &surface_normal, const Eigen::Vector3f &tangentspace_direction);
+
 
 };
 

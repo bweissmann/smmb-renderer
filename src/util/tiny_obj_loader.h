@@ -193,6 +193,23 @@ typedef struct {
 
   int pad2;
 
+  Eigen::Vector3f sig_s = Eigen::Vector3f(.219, .262, .3f).cwiseProduct(Eigen::Vector3f(3, 3, 3));
+//  Eigen::Vector3f sig_s = Eigen::Vector3f(2.19, 2.62, 3.f).cwiseProduct(Eigen::Vector3f(10, 10, 10));
+  Eigen::Vector3f sig_a = Eigen::Vector3f(2.1, 2.61, 3.f).cwiseProduct(Eigen::Vector3f(3, 3, 3));
+//  Eigen::Vector3f sig_a = Eigen::Vector3f(0.0021, 0.0041, 0.0071);
+//  Eigen::Vector3f sig_a = Eigen::Vector3f(0.0021, 0.0041, 0.0071).cwiseProduct(Eigen::Vector3f(10, 10, 10));
+  Eigen::Vector3f diff = Eigen::Vector3f(0.83, 0.79, 0.75);
+
+  // MILK !!
+//  Eigen::Vector3f sig_s = Eigen::Vector3f(0.7, 1.22, 1.90);
+//  Eigen::Vector3f sig_a = Eigen::Vector3f(0.0014, 0.0025, 0.0142);
+//  Eigen::Vector3f diff = Eigen::Vector3f(0.81, 0.81, 0.69);
+
+  // CREAM
+//  Eigen::Vector3f sig_s = Eigen::Vector3f(7.38, 5.47, 3.15).cwiseProduct(Eigen::Vector3f(.10, .10, .10));
+//  Eigen::Vector3f sig_a = Eigen::Vector3f(0.0002, 0.0028, 0.0163).cwiseProduct(Eigen::Vector3f(.10, .10, .10));
+//  Eigen::Vector3f diff = Eigen::Vector3f(0.98, 0.90, 0.73);
+
   std::map<std::string, std::string> unknown_parameter;
 } material_t;
 

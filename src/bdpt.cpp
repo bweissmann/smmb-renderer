@@ -100,7 +100,10 @@ Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, 
     Vector3f radiance = eye_path[max_eye_index].contrib;
     const Vector3f direction_to_light = (light.position - last_eye.position).normalized();
     float throughput = getDifferentialThroughput(last_eye.position, last_eye.surface_normal, light.position, light.surface_normal);
-    const Vector3f direct_brdf = BSDF::getBsdfFromType(eye_path[max_eye_index - 1].outgoing_ray, direction_to_light,
+
+    Ray ray(last_eye.position, direction_to_light, AIR_IOR, true);
+
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(eye_path[max_eye_index - 1].outgoing_ray, last_eye.position,  ray,
             last_eye.surface_normal, last_eye.mat, last_eye.type);
     Vector3f light_emission = light.contrib.cwiseProduct(direct_brdf) * throughput;
     radiance = radiance.cwiseProduct(light_emission);
@@ -137,12 +140,15 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
 
     //brdf at light node
     Ray incoming_ray = light_path[max_light_index - 1].outgoing_ray;
-    Vector3f light_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_eye_node, light_node.surface_normal,
+    Ray outgoing_ray(light_node.position, to_eye_node, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    Vector3f light_node_brdf = BSDF::getBsdfFromType(incoming_ray, light_node.position, outgoing_ray, light_node.surface_normal,
                                                      light_node.mat, light_node.type);
 
     //brdf at eye node
     incoming_ray = eye_path[max_eye_index - 1].outgoing_ray;
-    Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, to_light_node, eye_node.surface_normal,
+    outgoing_ray = Ray(eye_node.position, to_light_node, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+
+    Vector3f eye_node_brdf = BSDF::getBsdfFromType(incoming_ray, eye_node.position, outgoing_ray, eye_node.surface_normal,
                                                    eye_node.mat, eye_node.type);
     float throughput = getDifferentialThroughput(eye_node.position, eye_node.surface_normal, light_node.position, light_node.surface_normal);
     Vector3f total_contrib = light_path_contrib.cwiseProduct(eye_path_contrib);
@@ -221,7 +227,7 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
 float BDPT::threePointProbability(const PathNode &point, const PathNode &pointFrom, const PathNode &prior) {
     Vector3f outgoing = (point.position - pointFrom.position).normalized();
     Vector3f incoming = (pointFrom.position - prior.position).normalized();
-    float brdf_prob = BSDF::getBsdfDirectionalProb(incoming, outgoing, pointFrom.surface_normal, pointFrom.mat, pointFrom.type, 1.f);
+    float brdf_prob = BSDF::getBsdfDirectionalProb(incoming, outgoing, pointFrom.surface_normal, 0.0f, pointFrom.mat, pointFrom.type, 1.f);
     float throughput = getDifferentialThroughput(point.position, point.surface_normal, pointFrom.position, pointFrom.surface_normal);
     float cosine_theta = fabsf(pointFrom.surface_normal.dot(outgoing));
     return brdf_prob * throughput / cosine_theta;
@@ -272,7 +278,7 @@ float BDPT::computeSubpathProbability(const std::vector<PathNode> &subpath, int 
                 PathNode prev = subpath[i - 1];
                 Vector3f incoming_direction = (node.position - prev.position).normalized();
                 dir_prob = BSDF::getBsdfDirectionalProb(incoming_direction, outgoing_direction,
-                                             node.surface_normal, node.mat, node.type, 1.f);
+                                             node.surface_normal, 0.0f, node.mat, node.type, 1.f);
                 dir_prob *= PathTracer::getContinueProbability(node.brdf);
             }
             float geometry_term = getDifferentialThroughput(node.position, node.surface_normal, next.position, next.surface_normal);

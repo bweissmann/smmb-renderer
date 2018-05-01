@@ -15,7 +15,7 @@ SampleRay::SampleRay()
 }
 
 SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &position, const Ray &incoming_ray,
-                                    const Vector3f &surface_normal, const tinyobj::material_t& mat) {
+                                    const Vector3f &surface_normal, const tinyobj::material_t& mat, const Scene &scene) {
 
     switch (type) {
     case IDEAL_DIFFUSE:
@@ -26,11 +26,60 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
         return idealSpecularReflection(position, incoming_ray, surface_normal);
     case REFRACTION:
         return refraction(position, incoming_ray, surface_normal, mat);
+    case SCATTERING:
+        return scattering(position, incoming_ray, surface_normal, mat, scene);
     default:
         std::cerr << "(SampleRay) Unsupported Material Type" << std::endl;
         exit(1);
     }
 }
+
+SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incoming_ray,
+                                     const Vector3f &surface_normal, const tinyobj::material_t& mat,
+                                     const Scene &scene) {
+    SampledRayInfo r = uniformSampleHemisphere(position, incoming_ray, surface_normal);
+
+    Vector3f sig_t = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]) +
+            Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
+    Vector3f sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt();
+
+    float rad = std::sqrt(-std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f)); // HARD CODED IN !!!!! // sqrt ??
+//    rad = -std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f);
+//    std::cout << "rad: " << rad << std::endl;
+    float theta = 2.f * M_PI * MathUtils::random();
+
+    const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), 0.f, rad * sin(theta));
+    const Vector3f worldspace_pos = tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+
+    r.ray.o = position + worldspace_pos;
+    r.ray.d = -r.ray.d;
+
+    IntersectionInfo i;
+    if(scene.getBVH().getIntersection(r.ray, &i, false)) {
+//        std::cout << "yess" << std::endl;
+        r.ray.o = i.hit;
+    } else {
+//        std::cout << "no" << std::endl;
+    }
+
+    r.ray.d = -r.ray.d;
+
+//    std::cout << "rays: " << std::endl;
+//        std::cout << sig_tr << std::endl;
+//    std::cout << position << std::endl;
+//    std::cout << r.ray.o << std::endl;
+//    std::cout << (r.ray.o - position).norm() << std::endl;
+
+    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
+//    float prob = av_sig_tr * std::pow(M_E, -av_sig_tr * rad);
+    float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
+
+//    std::cout << prob << std::endl;
+
+//    return SampledRayInfo(r.ray, 0.16);
+    return SampledRayInfo(r.ray, r.prob * prob);
+}
+
 
 SampledRayInfo SampleRay::uniformSampleHemisphere(const Vector3f &position, const Ray &incoming_ray,
                                                   const Vector3f &surface_normal) {
@@ -162,4 +211,19 @@ Vector3f SampleRay::tangentToWorldSpace(const Vector3f &surface_normal, const Ve
     return (surface_tangent * tangentspace_direction.x() +
             surface_bitangent * tangentspace_direction.y() +
             surface_normal * tangentspace_direction.z()).normalized();
+}
+
+Vector3f SampleRay::tangentToWorldSpaceNotNormalized(
+        const Vector3f &surface_normal, const Vector3f &tangentspace_direction) {
+
+    // Create a ray to cross with the normal to get *a* tangent vector. Make sure its not equal to the normal
+    Vector3f not_the_normal = (surface_normal.x() > 0.1 || surface_normal.x() < -0.1)
+            ? Vector3f(0, 1.f, 0) : Vector3f(1.f, 0, 0);
+
+    const Vector3f surface_tangent = surface_normal.cross(not_the_normal);
+    const Vector3f surface_bitangent = surface_normal.cross(surface_tangent);
+
+    return (surface_tangent * tangentspace_direction.x() +
+            surface_bitangent * tangentspace_direction.y() +
+            surface_normal * tangentspace_direction.z());
 }

@@ -35,14 +35,14 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 10;
+    const int M_NUM_SAMPLES = 1000;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
     /* Indicates if image should be denoised or tone-mapped */
-    bool should_denoise = true;
+    bool should_denoise = false;
 
     const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
 
@@ -52,6 +52,9 @@ private:
     bool lightIsVisible(Eigen::Vector3f light_position, Eigen::Vector3f surface_position, const Scene& scene);
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
+
+    Eigen::Vector3f directLightContributionScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
+                                                 Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
 
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &nodes, const Eigen::Vector3f &prev_brdf);
 

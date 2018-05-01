@@ -169,14 +169,18 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         for (int j = 0; j < num_direct_light; j++) {
             SampledLightInfo light_info = scene.sampleLight();
             if (lightIsVisible(light_info.position, i.hit, scene)) {
-                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+                if (type == SCATTERING) {
+                    total_light += directLightContributionScattering(light_info, normal, type, i.hit, ray, mat, scene) / num_direct_light;
+                } else {
+                    total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+                }
             }
         }
 
-        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat, scene);
 
         const Ray next_ray = next_ray_info.ray;
-        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, i.hit, next_ray, normal, mat, type);
 
         float pdf_rr = getContinueProbability(brdf);
         if (MathUtils::random() < pdf_rr) {
@@ -242,16 +246,58 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
     const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
 
     if (direction_to_light.dot(light_info.normal) < 0) {
-        //return Vector3f(0, 0, 0);
+//        return Vector3f(0, 0, 0);
     }
 
     const float distance_squared = pow((surface_position - light_info.position).norm(), 2);
     const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
     const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
-    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, direction_to_light, surface_normal, mat, type);
-
+    Ray direction_to_light_ray(surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, direction_to_light_ray, surface_normal, mat, type);
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
 }
+
+
+Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
+                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene) {
+    if (type == REFRACTION || type == IDEAL_SPECULAR) {
+        return Vector3f(0.f, 0.f, 0.f);
+    }
+    const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
+
+    Vector3f sig_t = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]) +
+            Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
+
+    Vector3f sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt();
+
+    float rad = std::sqrt(-std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f)); // HARD CODED IN !!!!! // sqrt ??
+    float theta = 2.f * M_PI * MathUtils::random();
+    const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), -0.1f, rad * sin(theta));
+    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+
+    Vector3f new_surface_position = surface_position + worldspace_pos;
+    Ray r(new_surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+
+    r.d *= -1.f;
+
+    IntersectionInfo i;
+    if(scene.getBVH().getIntersection(r, &i, false)) {
+        r.o = i.hit;
+    } else {
+        return Vector3f(0, 0, 0);
+    }
+    r.d = -r.d;
+
+    const float distance_squared = pow((new_surface_position - light_info.position).norm(), 2);
+    const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
+    const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
+
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
+    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
+    float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
+    return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * prob);
+}
+
 
 
 //BIDIRECTIONAL FUNCTIONS
@@ -368,19 +414,23 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
 
         //get type of material
         MaterialType type = BSDF::getType(mat);
-        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat, scene);
         const Ray next_ray = next_ray_info.ray;
-        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, i.hit, next_ray, normal, mat, type);
         float pdf_rr = getContinueProbability(brdf);
 
         if (MathUtils::random() < pdf_rr) {
             Vector3f N = ray.is_in_air ? normal : -normal;
             float directional_prob = next_ray_info.prob * pdf_rr;
+
+            //TODO:: determine radius
             PathNode node(next_ray, contrib, next_ray.o, N, type, mat, directional_prob, 0);
             nodes.push_back(node);
             tracePath(next_ray, scene, depth + 1, nodes, brdf);
         } else {
             Vector3f N = ray.is_in_air ? normal : -normal;
+
+            //TODO:: determine radius
             PathNode node(ray, contrib, next_ray.o, N, type, mat, (1 - pdf_rr), 0);
             nodes.push_back(node);
         }
