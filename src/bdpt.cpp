@@ -107,7 +107,6 @@ Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, 
     return radiance;
 }
 
-//TODO:: why do we not multiply by the throughput??
 Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
     Vector3f to_light = (light.position - eye.position).normalized();
     return light.surface_normal.dot(to_light) < 0 ? light.emission : Vector3f(0,0,0);

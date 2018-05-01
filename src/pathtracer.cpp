@@ -133,6 +133,7 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0 ) {
             if (normal.dot(ray.d) < 0 && depth == 0) {
+
                 return emitted_light;
             } else {
                 return Vector3f(0.f, 0.f, 0.f);
@@ -140,7 +141,6 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         }
 
         MaterialType type = BSDF::getType(mat);
-
         //just return it up here
         float schlick = 1.f;
 

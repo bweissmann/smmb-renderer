@@ -1,0 +1,54 @@
+newmtl dragon_mat
+illum 4
+Kd 0.5 0.0 0.5
+Ka 0.00 0.00 0.00
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl floor_mat
+illum 4
+Kd 0.75 0.75 0.75
+Ka 0.00 0.00 0.00
+Ks 0 0 0
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl right_wall_mat
+illum 4
+Kd 0.01 0.0 0.50
+Ka 0.00 0.00 0.00
+Ks 0 0 0
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl left_wall_mat
+illum 4
+Kd 0.50 0.21 0.21
+Ka 0.00 0.00 0.00
+Ks 0 0 0
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl back_wall_mat
+illum 4
+Kd 0.80 0.80 0.80
+Ka 0.00 0.00 0.00
+Ks 0 0 0
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl ceiling_mat
+illum 4
+Kd 0.90 0.90 0.90
+Ka 0.00 0.00 0.00
+Tf 0.00 0.00 0.00
+Ni 1.00
+
+newmtl light_mat
+illum 4
+Ke 10 10 10
+Kd 0.0 0.0 0.0
+Ka 0.00 0.00 0.00
+Ks 0 0 0
+Tf 0.00 0.00 0.00
+Ni 1.00
