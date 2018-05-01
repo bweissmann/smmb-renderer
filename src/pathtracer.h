@@ -35,14 +35,14 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 50;
+    const int M_NUM_SAMPLES = 4;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
     /* Indicates if image should be denoised or tone-mapped */
-    bool should_denoise = true;
+    bool should_denoise = false;
 
     const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
 

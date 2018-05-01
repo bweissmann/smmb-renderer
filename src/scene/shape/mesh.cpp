@@ -131,6 +131,7 @@ void Mesh::createMeshBVH()
         (*_objects)[i] = &_triangles[i];
 
         const tinyobj::material_t &mat = getMaterial(i);
+
         if (mat.emission[0] > 0.01 || mat.emission[1] > 0.01 || mat.emission[2] > 0.01) {
             _emissive_triangles.push_back(i);
             m_emissive_area += _triangles[i].getArea();

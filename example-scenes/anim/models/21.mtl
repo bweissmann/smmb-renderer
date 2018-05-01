@@ -29,8 +29,8 @@ newmtl rightSphere
     Ks 0 0 0
     Ks 0.90 0.90 0.90
     #  Tf 0.10 0.10 0.10
-    Ns 5
-    #Ns 1000
+    # Ns 5
+    Ns 1000
     Ni 1.5
     illum 7
 
