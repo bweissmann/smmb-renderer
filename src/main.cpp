@@ -62,11 +62,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    std::cout << "sdfhi" << std::endl;
     PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, adjusted_image_height, section_id);
+    std::cout << "hiiiiiii" << std::endl;
 
     QRgb *data = reinterpret_cast<QRgb *>(image.bits());
 
+    std::cout << "hi" << std::endl;
     tracer.traceScene(data, *scene);
+    std::cout << "hsdfi" << std::endl;
     delete scene;
 
     bool success = image.save(output);

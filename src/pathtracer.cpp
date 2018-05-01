@@ -22,29 +22,40 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
-    // Initialize the tread pool
-    QThreadPool *threadPool = QThreadPool::globalInstance();
-    std::vector<RenderThread *> threads;
-    threads.resize(m_width * m_output_height);
-
-    // Setup intensity values and logging
-    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
-    StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
+    Vector3f *intensityValues = new Vector3f[m_width * m_output_height]; // Init intensity values
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
 
-    // start each thread
-    for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
-        for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
-            int thread_index = x + (y * m_width);
-            threads[thread_index] = new RenderThread;
-            threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat);
-            threads[thread_index]->setAutoDelete(false);
-            threadPool->start(threads[thread_index]);
+    if (RUN_WITH_MULTITHREADED) {
+        // Initialize the tread pool
+        QThreadPool *threadPool = QThreadPool::globalInstance();
+        std::vector<RenderThread *> threads;
+        threads.resize(m_width * m_output_height);
+
+        // Setup intensity values and logging
+        StatusLogger::initInstance(PARALLEL_RANGE, m_width, m_output_height); // Init status logger
+
+        // start each thread
+        for(int y = 0; y < m_output_height; y += PARALLEL_RANGE) {
+            for(int x = 0; x < m_width; x += PARALLEL_RANGE) {
+                int thread_index = x + (y * m_width);
+                threads[thread_index] = new RenderThread;
+                threads[thread_index]->setData(this, intensityValues, scene, x, y, PARALLEL_RANGE, &invViewMat);
+                threads[thread_index]->setAutoDelete(false);
+                threadPool->start(threads[thread_index]);
+            }
+        }
+
+        // Wait for rendering to finish
+        threadPool->waitForDone();
+    } else {
+        for(int y = 0; y < m_output_height; y ++) {
+            for(int x = 0; x < m_width; x ++) {
+                tracePixel(x, y, scene, intensityValues, invViewMat);
+            }
+
+            std::cout << y << std::endl;
         }
     }
-
-    // Wait for rendering to finish
-    threadPool->waitForDone();
 
     toneMap(imageData, intensityValues);
 }
@@ -57,7 +68,8 @@ void PathTracer::tracePixel(int output_x, int output_y, const Scene& scene,
     int output_index = output_x + output_y * m_width;
 
     Vector3f output_radience = Vector3f::Zero();
-    Vector3f eye_center(0, 0, 0);
+    Vector3f eye_center(0, 0, 3.5);
+//    Vector3f eye_center(0, 0, 1.5);
 
     for (int i = 0; i < M_NUM_SAMPLES; i++) {
         /* Sample an x and y randomly within the sensor square */
@@ -120,20 +132,24 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
 
         // Direct Light Contribution
         SampledLightInfo light_info = scene.sampleLight();
+//        std::cout << i.hit << std::endl;
         if (lightIsVisible(light_info.position, i.hit, scene)) {
             int num_direct_light = 10;
             for (int j = 0; j < num_direct_light; j++) {
-                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
+                total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat, scene) / num_direct_light;
+//                std::cout << "in" << std::endl;
             }
         }
 
-        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat);
+        const SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat, scene);
 
         const Ray next_ray = next_ray_info.ray;
-        const Vector3f brdf = BSDF::getBsdfFromType(ray, next_ray.d, normal, mat, type);
+//        std::cout << (next_ray.o - i.hit).norm() << std::endl;
+        const Vector3f brdf = BSDF::getBsdfFromType(ray, i.hit, next_ray, normal, mat, type);
 
         const float pdf_rr = getContinueProbability(brdf);
         if (MathUtils::random() < pdf_rr) {
+//            std::cout << depth << std::endl;
             // Deal with refraction separately
             if (type == REFRACTION) {
                 float d = (i.hit - ray.o).norm();
@@ -142,11 +158,15 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
                         / (pdf_rr * (1.f - schlick) * fmax(d*3, 1.f));
                 return refracted_light + total_light;
             }
+
             // All other material types
             Vector3f N = ray.is_in_air ? normal : -normal;
             int next_depth = (type == IDEAL_SPECULAR) ? 0 : depth + 1;
             const Vector3f reflected_light = traceRay(next_ray, scene, next_depth).cwiseProduct(brdf) * N.dot(next_ray.d)
                     / (next_ray_info.prob * pdf_rr * schlick);
+//                    / (50.f * pdf_rr * schlick);
+//            std::cout << brdf << std::endl;
+//            std::cout << "prob: " << next_ray_info.prob << std::endl;
             total_light += reflected_light;
         }
     }
@@ -186,8 +206,9 @@ bool PathTracer::lightIsVisible(Vector3f light_position, Vector3f surface_positi
     return false;
 }
 
-Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
-                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat) {
+Vector3f PathTracer::directLightContribution2(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
+                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat,
+                                             const Scene &scene) {
 
     if (type == REFRACTION || type == IDEAL_SPECULAR) {
         return Vector3f(0.f, 0.f, 0.f);
@@ -197,7 +218,89 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
     const float distance_squared = pow((surface_position - light_info.position).norm(), 2);
     const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
     const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
-    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, direction_to_light, surface_normal, mat, type);
+
+    Ray r(surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
 
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
 }
+
+Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
+                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat,
+                                             const Scene &scene) {
+
+    if (type == REFRACTION || type == IDEAL_SPECULAR) {
+        return Vector3f(0.f, 0.f, 0.f);
+    }
+
+    const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
+
+    Vector3f sig_t = mat.sig_s + mat.sig_a;
+    Vector3f sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt();
+
+    float rad = std::sqrt(-std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f)); // HARD CODED IN !!!!! // sqrt ??
+//    rad = -std::log(MathUtils::random());
+//    std::cout << "rad: " << rad << std::endl;
+    float theta = 2.f * M_PI * MathUtils::random();
+
+    const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), -0.1f, rad * sin(theta));
+    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+
+    Vector3f new_surface_position = surface_position + worldspace_pos;
+    Ray r(new_surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+
+    r.d *= -1.f;
+
+    IntersectionInfo i;
+    if(scene.getBVH().getIntersection(r, &i, false)) {
+//        std::cout << "yess" << std::endl;
+        r.o = i.hit;
+    } else {
+//        std::cout << "no" << std::endl;
+        return Vector3f(0, 0, 0);
+    }
+
+    r.d = -r.d;
+
+    const float distance_squared = pow((new_surface_position - light_info.position).norm(), 2);
+    const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
+    const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
+
+//    const Ray r(new_surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
+
+    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
+//    float prob = av_sig_tr * std::pow(M_E, -av_sig_tr * rad);
+    float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
+
+    return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * prob);
+}
+
+//Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
+//                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat) {
+
+//    if (type == REFRACTION || type == IDEAL_SPECULAR) {
+//        return Vector3f(0.f, 0.f, 0.f);
+//    }
+
+//    Vector3f sig_t = mat.sig_s + mat.sig_a;
+//    Vector3f sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt();
+
+//    float rad = std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f);
+//    float theta = 2.f * M_PI * MathUtils::random();
+
+//    const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), 0.f, rad * sin(theta));
+//    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+
+//    surface_position += worldspace_pos;
+
+//    const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
+//    const float distance_squared = pow((surface_position - light_info.position).norm(), 2);
+//    const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
+//    const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
+
+//    const Ray r(surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
+//    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
+
+//    return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
+//}

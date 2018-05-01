@@ -21,10 +21,12 @@ private:
     int m_width, m_image_height, m_output_height, m_section_id;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 200;
+    const int M_NUM_SAMPLES = 1000;
 
     /* Helpers for parallelism and logging */
     const int PARALLEL_RANGE = 20;
+
+    const bool RUN_WITH_MULTITHREADED = false;
 
     void toneMap(QRgb *imageData, Eigen::Vector3f *intensityValues);
 
@@ -35,7 +37,12 @@ private:
     bool lightIsVisible(Eigen::Vector3f light_position, Eigen::Vector3f surface_position, const Scene& scene);
 
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
-                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
+                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat,
+                                            const Scene &scene);
+
+    Eigen::Vector3f directLightContribution2(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
+                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat,
+                                            const Scene &scene);
 
 };
 
