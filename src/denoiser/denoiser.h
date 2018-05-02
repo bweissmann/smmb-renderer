@@ -53,6 +53,8 @@ private:
     void ratioValues(float a, float b, float c, float *ratio);
     template <class T>
     void filterWithWeights(int c_r, T *in, T *out, float** weights, T init);
+    void gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f* out);
+    void sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf);
     void saveImage(Eigen::Vector3f *buf, QString nameMod);
     void saveImage(float *buf, QString nameMod);
     void saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod);
