@@ -322,15 +322,15 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         const Ray camera_space_ray(eye_center, d, AIR_IOR, true);
         const Ray world_camera_space_ray = camera_space_ray.transform(invViewMatrix);
         const float cosine_theta = eye_normal_world.dot(world_camera_space_ray.d);
-        PathNode eye = PathNode(world_camera_space_ray, Vector3f(1, 1, 1), world_camera_space_ray.o, eye_normal_world, EYE,
-                        cosine_theta, 1.f);
+        PathNode eye = PathNode(world_camera_space_ray, Vector3f(1, 1, 1), world_camera_space_ray.o,
+                                world_camera_space_ray.o, eye_normal_world, EYE, cosine_theta, 1.f);
 
         //first node in light path
         SampledLightInfo light_info = scene.sampleLight();
         const Ray init_ray(light_info.position, Vector3f(0.f, 0.f, 0.f), AIR_IOR, true);
         SampledRayInfo ray_info = SampleRay::uniformSampleHemisphere(light_info.position, init_ray, light_info.normal);
-        PathNode light = PathNode(ray_info.ray, light_info.emission / light_info.prob, light_info.position, light_info.normal,
-                          LIGHT, ray_info.prob, light_info.prob);
+        PathNode light = PathNode(ray_info.ray, light_info.emission / light_info.prob, light_info.position, light_info.position,
+                                  light_info.normal, LIGHT, ray_info.prob, light_info.prob);
 
 
         std::vector<PathNode> eye_path = { eye };
@@ -367,7 +367,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
                 sampleInfo.sample_color = Vector3f(eye_path[1].mat.specular[0], eye_path[1].mat.specular[2], eye_path[1].mat.specular[2]);
             }
         }
-        sampleInfo.sample_depth = (eye_path[1].position - (Affine3f)invViewMatrix * eye_path[0].position).norm();
+        sampleInfo.sample_depth = (eye_path[1].hit_position - (Affine3f)invViewMatrix * eye_path[0].hit_position).norm();
         total_info.samplesPerPixel[i] = sampleInfo;
         total_info.radiance += sampleInfo.sample_radiance;
       }
@@ -403,10 +403,10 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
                 if (lastNodeIndex == 0) {
                     contrib = emitted_light;
                 } else {
-                    float throughput = BDPT::getDifferentialThroughput(i.hit, N, lastNode.position, lastNode.surface_normal);
+                    float throughput = BDPT::getDifferentialThroughput(i.hit, N, lastNode.left_from, lastNode.surface_normal);
                     contrib = prev_brdf.cwiseProduct(lastNode.contrib.cwiseProduct(emitted_light)) * throughput;
                 }
-                PathNode node(ray, contrib, i.hit, N, LIGHT, mat, 1.f / (2.f * M_PI), 1.f);
+                PathNode node(ray, contrib, i.hit, i.hit, N, LIGHT, mat, 1.f / (2.f * M_PI), 1.f);
                 nodes.push_back(node);
             }
             return;
@@ -424,14 +424,14 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
             float directional_prob = next_ray_info.prob * pdf_rr;
 
             //TODO:: determine radius
-            PathNode node(next_ray, contrib, next_ray.o, N, type, mat, directional_prob, 0);
+            PathNode node(next_ray, contrib, i.hit, next_ray.o, N, type, mat, directional_prob, 0);
             nodes.push_back(node);
             tracePath(next_ray, scene, depth + 1, nodes, brdf);
         } else {
             Vector3f N = ray.is_in_air ? normal : -normal;
 
             //TODO:: determine radius
-            PathNode node(ray, contrib, next_ray.o, N, type, mat, (1 - pdf_rr), 0);
+            PathNode node(ray, contrib, i.hit, next_ray.o, N, type, mat, (1 - pdf_rr), 0);
             nodes.push_back(node);
         }
     }

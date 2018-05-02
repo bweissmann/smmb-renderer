@@ -44,7 +44,7 @@ private:
     /* Indicates if image should be denoised or tone-mapped */
     bool should_denoise = false;
 
-    const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
+    const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
 
     void toneMap(QRgb *imageData, PixelInfo *pixelInfo);
 
