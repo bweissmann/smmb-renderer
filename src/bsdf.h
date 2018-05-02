@@ -12,7 +12,8 @@ enum MaterialType {
     IDEAL_SPECULAR,
     GLOSSY_SPECULAR,
     REFRACTION,
-    SCATTERING,
+    DIFFUSE_SCATTERING,
+    SINGLE_SCATTERING,
     LIGHT,
     EYE
 };
@@ -39,7 +40,12 @@ private:
 
     static float fresnel(float n1, float n2, float cosi);
 
+    static Eigen::Vector3f reflectance(float r, const tinyobj::material_t &mat);
+
     static Eigen::Vector3f bssrdf(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
+                                      Eigen::Vector3f normal, const tinyobj::material_t& mat);
+
+    static Eigen::Vector3f bssrdf2(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
                                       Eigen::Vector3f normal, const tinyobj::material_t& mat);
 
     static Eigen::Vector3f bssrdf1(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,

@@ -22,10 +22,14 @@ public:
     static SampledRayInfo sampleRay(const MaterialType type, const Eigen::Vector3f &position, const Ray &incoming_ray,
                                         const Eigen::Vector3f &surface_normal, const tinyobj::material_t& mat, const Scene &scene);
 
+    static SampledRayInfo singleScattering(const Eigen::Vector3f &position, const Ray &incoming_ray,
+                                     const Eigen::Vector3f &surface_normal, const tinyobj::material_t &mat, const Scene &scene);
 
     static SampledRayInfo scattering(const Eigen::Vector3f &position, const Ray &incoming_ray,
                                      const Eigen::Vector3f &surface_normal, const tinyobj::material_t &mat, const Scene &scene);
 
+    static SampledRayInfo scattering2(const Eigen::Vector3f &position, const Ray &incoming_ray,
+                                     const Eigen::Vector3f &surface_normal, const tinyobj::material_t &mat, const Scene &scene);
 
     static SampledRayInfo uniformSampleHemisphere(const Eigen::Vector3f &position, const Ray &incoming_ray,
                                                   const Eigen::Vector3f &surface_normal);

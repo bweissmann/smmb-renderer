@@ -21,9 +21,12 @@ Vector3f BSDF::getBsdfFromType(Ray incoming_ray, Vector3f &position, Ray outgoin
         return glossySpecularBsdf(incoming_ray, outgoing_ray.d, normal, mat);
     case REFRACTION:
         return refractionBsdf(incoming_ray, outgoing_ray.d, normal, mat);
-    case SCATTERING:
-        return 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat)
-                    + 0.5 * bssrdf1(incoming_ray, position, outgoing_ray, normal, mat);
+    case DIFFUSE_SCATTERING:
+        return 1.0 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
+//                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
+    case SINGLE_SCATTERING:
+        return 1.0 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
+//                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
     default:
         std::cout << type << std::endl;
         std::cerr << "(BRDF) Unsupported Material Type"  << std::endl;
@@ -36,13 +39,18 @@ MaterialType BSDF::getType(const tinyobj::material_t& mat) {
     Vector3f transmittance(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
     Vector3f emission(mat.emission[0], mat.emission[1], mat.emission[2]);
     Vector3f scattering(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
-    if (emission.norm() > .1) {
+    if (emission.norm() > 0.1) {
         return LIGHT;
-    } else if (scattering.norm() > .1) {
-        return SCATTERING;
+    } else if (transmittance.norm() > 0.01) {
+        if (MathUtils::random() < 0.5) {
+            return DIFFUSE_SCATTERING;
+        } else {
+            return SINGLE_SCATTERING;
+        }
     } else if (transmittance.norm() > 0.1) {
         return REFRACTION;
     } else if (specular.norm() < DIFFUSE_CUTOFF) {
+//        std::cout << "diff" << std::endl;
         return IDEAL_DIFFUSE;
     } else if (mat.shininess < SPECULAR_CUTOFF) {
         return GLOSSY_SPECULAR;
@@ -75,79 +83,40 @@ Vector3f BSDF::bssrdf1(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing
     for (int i = 0; i < 3; i++) {
         float total = 0.f;
         for (int j = 0; j < 10; j++) {
-
-
             float sig_t = mat.transmittance[i] + mat.ambient[i];
+//            Vector3f sig_t = sig_a + sig_s;
+//            float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
+            float sig_tr = std::sqrt(3.f * mat.ambient[i] * sig_t);
             float s_o = -std::log(MathUtils::random())/sig_t;
 //            float s_o = std::sqrt(-std::log(MathUtils::random())/sig_t);
 
             Vector3f p = outgoing_ray.o + (s_o * wp_o);
-            float s_i = pow((p - position).norm(), 2);
+            float s_i = (p - position).norm();
+//            float s_i = pow((p - position).norm(), 2)/2.f;
 //            std::cout << "s_o: " << s_o << ", s_i: " << s_i << std::endl;
 
             float dot_wn = (-incoming_ray.d).dot(normal);
             float s_i_prime = (s_i * dot_wn)/std::sqrt(1.f - pow(1.f/n, 2) * (1.f - pow(dot_wn, 2)));
 
 //            std::cout << "s_i: " << s_i << ", s_i_prime: " << s_i_prime << std::endl;
-//            std::cout << "s_i_prime: " << s_i_prime << std::endl;
-//            float cos_i = normal.dot(-incoming_ray.d);
-//            if (cos_i < -1.f) {
-//                cos_i = -1.f;
-//            } else if (cos_i > 1.f) {
-//                cos_i = 1.f;
-//            }
-//        //                std::cout << "cosi: " << cos_i << std::endl;
-
             float ft_i = fresnel(AIR_IOR, 1.3, normal.dot(-incoming_ray.d));
-//            if (cos_i > 0) {
-//                float sin_t = AIR_IOR/1.3 * sqrt(std::max(0.f, 1.f - powf(cos_i, 2)));
-//                if (sin_t > 1) {
-//                    ft_i = 0.f;
-//                } else {
-//                    float cos_t = sqrtf(std::max(0.f, 1 - sin_t * sin_t));
-//                    ft_i = fresnel(AIR_IOR, 1.3, cos_i, cos_t);
-//                }
-//            } else {
-//                float sin_t = 1.3/AIR_IOR * sqrt(std::max(0.f, 1.f - powf(cos_i, 2)));
-//                if (sin_t > 1) {
-//                    ft_i = 0.f;
-//                } else {
-//                    float cos_t = sqrtf(std::max(0.f, 1 - sin_t * sin_t));
-//                    ft_i = fresnel(1.3, AIR_IOR, cos_i, cos_t);
-//                }
-//            }
-    //        ft_i *= 10.f;
-    //        float theta_t_sqrd = std::abs(SampleRay::refractionGetAngleSquared(incoming_ray, normal, mat));
-    //        float cos_theta_t = std::sqrt(theta_t_sqrd);
-    //        float theta_i = normal.dot(-incoming_ray.d);
-
-    //        float n_i = AIR_IOR;
-    //        float n_t = 1.3;
-
-    //        float ft_i = (2.f * n_i * std::cos(theta_i))/(n_i * cos_theta_t + n_t * std::cos(theta_i));
             float G = std::abs(normal.dot(wp_o)/normal.dot(wp_i));
-//            std::cout << G << std::endl;
             float sig_tc = sig_t + G * sig_t;
-//            std::cout << sig_tc << std::endl;
 
-    //        std
             float res = (mat.transmittance[i] * (1.f/(4.f*M_PI)))/sig_tc;
-//            float res = (mat.sig_s[i] * ft_i * (1.f/(4.f*M_PI)))/sig_tc;
             res *= pow(M_E, -std::abs(s_i_prime) * sig_t);
-            res *= pow(M_E, -s_o * sig_t) * ft_i;
+            res *= pow(M_E, -s_o * sig_t) * ft_i * 100.f;
 
 //            std::cout << -std::abs(s_i_prime) * sig_t << std::endl;
+//            std::cout << res << std::endl;
             total += res;
         }
-        single_scat[i] = total/20.f;
+        single_scat[i] = total/10.f;
     }
 
 //    std::cout << single_scat << std::endl;
     outgoing_ray.d = -1.f * outgoing_ray.d;
     return single_scat;
-//    re
-//    float av_sig_t = (sig_t[0] + sig_t[1] + sig_t[2])/3.f;
-//    float dist = std::log(MathUtils::random())/av_sig_t;
 }
 
 float BSDF::fresnel(float n1, float n2, float cosi) {
@@ -176,8 +145,54 @@ float BSDF::fresnel(float n1, float n2, float cosi) {
 }
 
 
-
 Vector3f BSDF::bssrdf(Ray incoming_ray, Vector3f &position, Ray outgoing_ray, Vector3f normal,
+                      const tinyobj::material_t &mat) {
+    float r = (position - outgoing_ray.o).norm();
+    Vector3f R = reflectance(r, mat);
+
+    float ft_i = fresnel(AIR_IOR, 1.3, normal.dot(-incoming_ray.d));
+    float ft_o = fresnel(AIR_IOR, 1.3, normal.dot(outgoing_ray.d));
+
+    for (int i = 0; i < 3; i++) {
+        R[i] *= mat.diff[i];
+    }
+
+    return ft_i * R * ft_o;
+}
+
+
+Vector3f BSDF::reflectance(float r, const tinyobj::material_t &mat) {
+    Vector3f R;
+
+    for (int i = 0; i < 3; i++) {
+        float sig_s = mat.transmittance[i];
+        float sig_a = mat.ambient[i];
+        float sig_t = sig_s + sig_a;
+        float sig_tr = std::sqrt(3.f * sig_a * sig_t);
+
+        float alpha = sig_s/sig_t;
+
+        float F_dr = fdr(1.3);
+        float A = (1.f + F_dr)/(1.f - F_dr);
+        float D = 1.f/(3.f * sig_t);
+
+        float z_v = 1.f/sig_t;
+        float z_r = z_v + 4 * A * D;
+
+        float d_r = std::sqrt(pow(z_r, 2) + pow(r, 2));
+        float d_v = std::sqrt(pow(z_v, 2) + pow(r, 2));
+
+        float r_r = z_r * (sig_tr * d_r + 1.f) * (pow(M_E, -sig_tr * d_r)/pow(d_r, 3));
+        float r_v = z_v * (sig_tr * d_v + 1.f) * (pow(M_E, -sig_tr * d_v)/pow(d_v, 3));
+
+        R[i] = alpha/(4.f * M_PI) * (r_r + r_v);
+    }
+
+    return R;
+}
+
+
+Vector3f BSDF::bssrdf2(Ray incoming_ray, Vector3f &position, Ray outgoing_ray, Vector3f normal,
                       const tinyobj::material_t &mat) {
     //    if (std::abs(-incoming_ray.d.dot(normal) - 1.f) <= 0.0001f) {
     ////        std::cout << -incoming_ray.d.dot(normal) << std::endl;
@@ -327,7 +342,8 @@ float BSDF::getBsdfDirectionalProb(const Vector3f &incoming, const Vector3f &out
         return idealSpecularProb(incoming, outgoing, normal);
     case REFRACTION:
         return idealRefractionProb(incoming, outgoing, normal, eta);
-    case SCATTERING:
+    case DIFFUSE_SCATTERING:
+    case SINGLE_SCATTERING:
         return 1.f;
     default:
         std::cerr << "(BRDF) Unsupported Material Type"  << std::endl;

@@ -16,7 +16,6 @@ SampleRay::SampleRay()
 
 SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &position, const Ray &incoming_ray,
                                     const Vector3f &surface_normal, const tinyobj::material_t& mat, const Scene &scene) {
-
     switch (type) {
     case IDEAL_DIFFUSE:
         return sampleIdealDiffuseImportance(position, incoming_ray, surface_normal);
@@ -26,7 +25,10 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
         return idealSpecularReflection(position, incoming_ray, surface_normal);
     case REFRACTION:
         return refraction(position, incoming_ray, surface_normal, mat);
-    case SCATTERING:
+    case SINGLE_SCATTERING:
+//        return singleScattering(position, incoming_ray, surface_normal, mat, scene);
+        return scattering(position, incoming_ray, surface_normal, mat, scene);
+    case DIFFUSE_SCATTERING:
         return scattering(position, incoming_ray, surface_normal, mat, scene);
     default:
         std::cerr << "(SampleRay) Unsupported Material Type" << std::endl;
@@ -34,7 +36,110 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
     }
 }
 
+
+SampledRayInfo SampleRay::singleScattering(const Vector3f &position, const Ray &incoming_ray,
+                                     const Vector3f &surface_normal, const tinyobj::material_t& mat,
+                                     const Scene &scene) {
+    SampledRayInfo sampled_ray = uniformSampleHemisphere(position, incoming_ray, surface_normal);
+
+    float eps_1 = MathUtils::random();
+    float eps_2 = MathUtils::random();
+
+    Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
+    Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
+    Vector3f sig_t = sig_a + sig_s;
+    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
+
+    float r = -std::log(eps_1)/sig_tr;
+    float theta = 2.f * M_PI * eps_2;
+
+    const Vector3f tangentspace_pos = Vector3f(r * cos(theta), 0.0f, r * sin(theta));
+    const Vector3f worldspace_pos = tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+//    sampled_ray.ray.o = position + worldspace_pos;
+
+    sampled_ray.ray.o = position + worldspace_pos;
+    sampled_ray.ray.d = -sampled_ray.ray.d;
+
+    IntersectionInfo i;
+    float d = r;
+    Vector3f normal = surface_normal;
+    Ray back_normal(sampled_ray.ray.o, -surface_normal, AIR_IOR, true);
+    if(scene.getBVH().getIntersection(back_normal, &i, false)) {
+        const Mesh * m = static_cast<const Mesh *>(i.object);
+        const Triangle *t = static_cast<const Triangle *>(i.data);
+//        normal = t->getNormal(i);
+        sampled_ray.ray.o = i.hit;
+//        d = (sampled_ray.ray.o - position).norm();
+    }
+
+    sampled_ray.ray.d = -sampled_ray.ray.d;
+    float pdf = sig_tr * pow(M_E, -sig_tr * r);
+
+//    std::cout << "RAD: " << r << std::endl;
+    return SampledRayInfo(sampled_ray.ray, sampled_ray.prob * std::abs(pdf));
+}
+
+
 SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incoming_ray,
+                                     const Vector3f &surface_normal, const tinyobj::material_t& mat,
+                                     const Scene &scene) {
+    SampledRayInfo sampled_ray = uniformSampleHemisphere(position, incoming_ray, surface_normal);
+
+    float eps_1 = MathUtils::random();
+    float eps_2 = MathUtils::random();
+
+    Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
+    Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
+    Vector3f sig_t = sig_a + sig_s;
+
+    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
+    float v = 1.f/(2.f * sig_tr);
+    float R_m = std::sqrt(v/12.46);
+
+    float r = std::sqrt(std::log(1.f - eps_1 * (1.f - pow(M_E, -sig_tr * pow(R_m, 2))))/-sig_tr);
+    float theta = 2.f * M_PI * eps_2;
+
+    const Vector3f tangentspace_pos = Vector3f(r * cos(theta), 0.0f, r * sin(theta));
+    const Vector3f worldspace_pos = tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
+//    sampled_ray.ray.o = position + worldspace_pos;
+
+    sampled_ray.ray.o = position + worldspace_pos;
+    sampled_ray.ray.d = -sampled_ray.ray.d;
+
+    IntersectionInfo i;
+    float d = r;
+    Vector3f normal = surface_normal;
+    Ray back_normal(sampled_ray.ray.o, -surface_normal, AIR_IOR, true);
+    if(scene.getBVH().getIntersection(back_normal, &i, false)) {
+        const Mesh * m = static_cast<const Mesh *>(i.object);
+        const Triangle *t = static_cast<const Triangle *>(i.data);
+        normal = t->getNormal(i);
+        sampled_ray.ray.o = i.hit;
+        d = (sampled_ray.ray.o - position).norm();
+    }
+
+    sampled_ray.ray.d = -sampled_ray.ray.d;
+
+//    float d = (sampled_ray.ray.o - position).norm();
+//    std::cout << "r: " << r << " d: " << d << std::endl;
+    float R_dr =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(r, 2)/(2.f * v));
+    float R_dr2 =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(d, 2)/(2.f * v));
+//    float R_dr = 1.f/M_PI * sig_tr * pow(M_E, -sig_tr * pow(r, 2));
+//    float pdf = R_dr/(1.f - pow(M_E, -sig_tr * pow(R_m, 2)));
+    float pdf = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)))/100.f;
+//    pdf = (R_dr2/pdf)/(normal.dot(-sampled_ray.ray.d));
+
+//    if (pdf < 0.0001) {
+//        pdf = 0.0001;
+//    }
+//    std::cout << pdf << std::endl;
+//    std::cout << R_dr << std::endl;
+//    std::cout << "denomn: " << (1.f - pow(M_E, -pow(R_m, 2)/(2.f * v))) << std::endl;
+    return SampledRayInfo(sampled_ray.ray, sampled_ray.prob * std::abs(pdf));
+}
+
+
+SampledRayInfo SampleRay::scattering2(const Vector3f &position, const Ray &incoming_ray,
                                      const Vector3f &surface_normal, const tinyobj::material_t& mat,
                                      const Scene &scene) {
     SampledRayInfo r = uniformSampleHemisphere(position, incoming_ray, surface_normal);
@@ -74,7 +179,7 @@ SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incomi
 //    float prob = av_sig_tr * std::pow(M_E, -av_sig_tr * rad);
     float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
 
-//    std::cout << prob << std::endl;
+//    std::cout << "prob: " << prob << std::endl;
 
 //    return SampledRayInfo(r.ray, 0.16);
     return SampledRayInfo(r.ray, r.prob * prob);
