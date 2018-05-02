@@ -9,35 +9,35 @@ Ni 1.00
 
 newmtl back_wall
 illum 4
-Kd 0.090 0.090 0.090
+Kd 0.90 0.90 0.90
 Ka 0.00 0.00 0.00
 Tf 0.00 0.00 0.00
 Ni 1.00
 
 newmtl floor
 illum 4
-Kd 0.050 0.050 0.050
+Kd 0.50 0.50 0.50
 Ka 0.00 0.00 0.00
 Tf 0.00 0.00 0.00
 Ni 1.00
 
 newmtl ceiling
 illum 4
-Kd 0.10 0.10 0.10
+Kd 0.70 0.70 0.70
 Ka 0.00 0.00 0.00
 Tf 0.00 0.00 0.00
 Ni 1.00
 
 newmtl left_wall
 illum 4
-Kd 0.090 0.010 0.010
+Kd 0.90 0.10 0.10
 Ka 0.00 0.00 0.00
 Tf 0.00 0.00 0.00
 Ni 1.00
 
 newmtl right_wall
 illum 4
-Kd 0.010 0.010 0.090
+Kd 0.10 0.10 0.90
 Ka 0.00 0.00 0.00
 Tf 0.00 0.00 0.00
 Ni 1.00

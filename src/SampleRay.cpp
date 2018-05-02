@@ -133,7 +133,7 @@ SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incomi
 //        pdf = 0.0001;
 //    }
 //    std::cout << pdf << std::endl;
-//    std::cout << R_dr << std::endl;
+//    std::cout << r << std::endl;
 //    std::cout << "denomn: " << (1.f - pow(M_E, -pow(R_m, 2)/(2.f * v))) << std::endl;
     return SampledRayInfo(sampled_ray.ray, sampled_ray.prob * std::abs(pdf));
 }

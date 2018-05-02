@@ -270,9 +270,10 @@ float BDPT::computeSubpathProbability(const std::vector<PathNode> &subpath, int 
 
             if (i > 0) {
                 PathNode prev = subpath[i - 1];
+                float radius = (node.hit_position - node.left_from).norm();
                 Vector3f incoming_direction = (node.hit_position - prev.left_from).normalized();
                 dir_prob = BSDF::getBsdfDirectionalProb(incoming_direction, outgoing_direction,
-                                             node.surface_normal, 0.0f, node.mat, node.type, 1.f);
+                                             node.surface_normal, radius, node.mat, node.type, 1.f);
                 dir_prob *= PathTracer::getContinueProbability(node.brdf);
             }
             float geometry_term = getDifferentialThroughput(node.left_from, node.surface_normal, next.hit_position, next.surface_normal);

@@ -340,6 +340,7 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
     float rad = std::sqrt(-std::log(MathUtils::random())/(sig_tr.norm()));
 //    float rad = std::sqrt(-std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f)); // HARD CODED IN !!!!! // sqrt ??
     float theta = 2.f * M_PI * MathUtils::random();
+//    std::cout << rad << std::endl;
     const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), 0.01f, rad * sin(theta));
 //    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
     const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(direction_to_light, tangentspace_pos);
@@ -365,6 +366,7 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
     float av_sig_tr = sig_tr.norm();
 //    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
     float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
+//    std::cout << prob << std::endl;
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * prob);
 }
 

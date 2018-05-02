@@ -63,6 +63,8 @@ private:
 
     static Eigen::Vector3f idealDiffuseBsdf(const tinyobj::material_t& mat);
 
+    static float scatteringProb(float radius, const tinyobj::material_t& mat);
+
     static float cosineWeightedProb(const Eigen::Vector3f &outgoing, Eigen::Vector3f normal);
 
     static float glossyWeightedProb(const Eigen::Vector3f &incoming, const Eigen::Vector3f &outgoing, Eigen::Vector3f normal, const tinyobj::material_t& mat);

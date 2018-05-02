@@ -1,8 +1,8 @@
 <scenefile>
 	<cameradata>
-		<pos x="0" y="10" z="10"/>
-		<up x="0" y="1" z="0"/>
-		<focus x="0" y="5" z="0"/>
+		<pos x="2" y="9" z="2"/>
+		<up x="0" y="5" z="0"/>
+		<focus x="-5" y="6" z="-1"/>
 		<heightangle v="90"/>
 	</cameradata>
 
@@ -19,5 +19,4 @@
 			</object>
 		</transblock> -->
 	</object>
-
 </scenefile>

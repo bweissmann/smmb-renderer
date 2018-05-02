@@ -25,7 +25,7 @@ Vector3f BSDF::getBsdfFromType(Ray incoming_ray, Vector3f &position, Ray outgoin
         return 1.0 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
 //                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
     case SINGLE_SCATTERING:
-        return 1.0 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
+        return 1.0 * bssrdf1(incoming_ray, position, outgoing_ray, normal, mat);
 //                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
     default:
         std::cout << type << std::endl;
@@ -45,7 +45,8 @@ MaterialType BSDF::getType(const tinyobj::material_t& mat) {
         if (MathUtils::random() < 0.5) {
             return DIFFUSE_SCATTERING;
         } else {
-            return SINGLE_SCATTERING;
+//            return SINGLE_SCATTERING;
+            return DIFFUSE_SCATTERING;
         }
     } else if (transmittance.norm() > 0.1) {
         return REFRACTION;
@@ -344,11 +345,33 @@ float BSDF::getBsdfDirectionalProb(const Vector3f &incoming, const Vector3f &out
         return idealRefractionProb(incoming, outgoing, normal, eta);
     case DIFFUSE_SCATTERING:
     case SINGLE_SCATTERING:
-        return 1.f;
+        return scatteringProb(radius, mat);
     default:
         std::cerr << "(BRDF) Unsupported Material Type"  << std::endl;
         exit(1);
     }
+}
+
+//check this for probability
+float BSDF::scatteringProb(float radius, const tinyobj::material_t& mat) {
+//    std::cout << "hi" << std::endl;
+//    return fabsf(outgoing.dot(normal) / M_PI);
+    Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
+    Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
+    Vector3f sig_t = sig_a + sig_s;
+
+    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
+    float v = 1.f/(2.f * sig_tr);
+    float R_m = std::sqrt(v/12.46);
+
+    float R_dr =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(radius, 2)/(2.f * v));
+//    float R_dr2 =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(d, 2)/(2.f * v));
+//    float R_dr = 1.f/M_PI * sig_tr * pow(M_E, -sig_tr * pow(r, 2));
+//    float pdf = R_dr/(1.f - pow(M_E, -sig_tr * pow(R_m, 2)));
+    float pdf = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)))/(2.f * M_PI);
+
+//    std::cout << pdf << std::endl;
+    return pdf;
 }
 
 //check this for probability
