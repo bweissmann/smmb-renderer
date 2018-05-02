@@ -326,6 +326,28 @@ void Denoiser::prefilterFeatures() {
     filterWithWeights(c_r, m_normalValuesB, m_normalValuesB, normal_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
     filterWithWeights(c_r, m_depthValuesA, m_depthValuesA, depth_prefilter_weights, 0.f);
     filterWithWeights(c_r, m_depthValuesB, m_depthValuesB, depth_prefilter_weights, 0.f);
+    // do a squared difference of the two buffers and set this to be the variance as it stands.
+    for (int i = 0; i < pixels; i++) {
+        Eigen::Vector3f colourDiff;
+        Eigen::Vector3f normalDiff;
+        float depthDiff;
+        Eigen::Vector3f depthDiff_vec;
+        squaredDifference(m_colourValuesA[i], m_colourValuesB[i], &colourDiff);
+        squaredDifference(m_normalValuesA[i], m_normalValuesB[i], &normalDiff);
+        squaredDifference(m_depthValuesA[i], m_depthValuesB[i], &depthDiff);
+        depthDiff_vec = Eigen::Vector3f(depthDiff, depthDiff, depthDiff);
+        m_colour_variances[i] = colourDiff;
+        m_normal_variances[i] = normalDiff;
+        depth_vec[i] = depthDiff_vec;
+    }
+    // we need to filter each of these variance buffers with a Gaussian with standard deviation of
+    // 0.5 pixels. Then we are done.
+    gaussianBlur(0.5f, m_colour_variances, m_colour_variances);
+    gaussianBlur(0.5f, m_normal_variances, m_normal_variances);
+    gaussianBlur(0.5f, depth_vec, depth_vec);
+    for (int i = 0; i < pixels; i++) {
+        m_depth_variances[i] = depth_vec[i](0);
+    }
 }
 
 
@@ -368,8 +390,8 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
         getCoords(pixel, m_width, &row, &col); // get the current coordinate
         std::cout << col  << ", " << row << std::endl;
         // we can get the centre patch at this point. It does not change.
-        for (int col_P = col - c_f; col_P <= col + c_f; col_P++) { // FOR EACH PIXEL
-            for (int row_P = row - c_f; row_P <= row + c_f; row_P++) { // IN CENTRE PATCH
+        for (int row_P = row - c_f; row_P <= row + c_f; row_P++) { // FOR EACH PIXEL
+            for (int col_P = col - c_f; col_P <= col + c_f; col_P++) { // IN CENTRE PATCH
                 int patch_index = getIndex((2 * c_f) + 1, row_P - (row - c_f), col_P - (col - c_f));
                 // if we are out of bounds on the actual image, then we can't include this pixel
                 // and we must mark it as invalid, and then continue on
@@ -384,8 +406,8 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
             }
         }
         // we can now iterate through the neighbourhood
-        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
-            for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
+        for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
+            for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
                 int neighbourhood_index = getIndex((2 * c_r) + 1, row_N - (row - c_r), col_N - (col - c_r));
                 // if we are out of bounds on the actual image, then we can't include this pixel
                 // and we must mark it as invalid, and then continue on
@@ -398,8 +420,8 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
                 N[neighbourhood_index] = in[image_index];
                 N_weights[neighbourhood_index] = 0.f;
                 // now we should get the patch surrounding the current neigbour
-                for (int col_Q = col_N - c_f; col_Q <= col_N + c_f; col_Q++) {
-                    for (int row_Q = row_N - c_f; row_Q <= row_N + c_f; row_Q++) {
+                for (int row_Q = row_N - c_f; row_Q <= row_N + c_f; row_Q++) {
+                    for (int col_Q = col_N - c_f; col_Q <= col_N + c_f; col_Q++) {
                         int patch_index = getIndex((2 * c_f) + 1, row_Q - (row_N - c_f), col_Q - (col_N - c_f));
                         // if we are out of bounds on the actual image, then we can't include this pixel
                         // and we must mark it as invalid, and then continue on
@@ -519,6 +541,145 @@ void Denoiser::calculateBufferVariance(int num_pixels, T** samples, int* num_sam
         out[i] = variance;
     }
 }
+
+template <class T>
+void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init) {
+    int pixels = m_height * m_width;
+    T temp[pixels];
+    for (int i = 0; i < pixels; i++) {
+        int row, col;
+        getCoords(i, m_width, &row, &col);
+        float weight_total = 0.f;
+        T accumulator = init;
+        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
+            for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
+                if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
+                int neighbourhood_index = getIndex((2 * c_r) + 1, row_N - (row - c_r), col_N - (col - c_r));
+                int image_index = getIndex(m_width, row_N, col_N);
+                weight_total += weights[i][neighbourhood_index];
+                accumulator += weights[i][neighbourhood_index] * in[image_index];
+            }
+        }
+        temp[i] = accumulator / weight_total;
+    }
+    for (int i = 0; i < pixels; i++) {
+        out[i] = temp[i];
+    }
+}
+
+void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f* out) {
+    // make a temporary array
+    int num_pixels = m_height * m_width;
+    Eigen::Vector3f temp_buf[num_pixels];
+    // generate Gaussian kernel
+    int radius = std::ceil(std_dev * 3.f); // we don't care about being >3sigma away
+    int kernel_size = ((2 * radius) + 1) * ((2 * radius) + 1);
+    float kernel[kernel_size];
+    float normalizer = 0.f;
+    for (int i = 0; i < kernel_size; i++) {
+        int row, col;
+        getCoords(i, (2 * radius) + 1, &row, &col);
+        int x = col - radius;
+        int y = row - radius;
+        float weight = std::exp(-((x * x) + (y * y))/(2.f * (std_dev * std_dev)));
+        weight = weight * (1.f / (2.f * M_PI * (std_dev * std_dev)));
+        kernel[i] = weight;
+        normalizer += weight;
+    }
+    // iterate over all pixels and perform filter
+    // for the (2f + 1) x (2f + 1) centre patch
+    Eigen::Vector3f P[kernel_size];
+    bool P_valid[kernel_size];
+    for (int i = 0; i < num_pixels; i++) {
+        int row, col;
+        getCoords(i, m_width, &row, &col);
+        for (int col_P = col - radius; col_P <= col + radius; col_P++) { // FOR EACH PIXEL
+            for (int row_P = row - radius; row_P <= row + radius; row_P++) { // IN CENTRE PATCH
+                int kernel_index = getIndex((2 * radius) + 1, row_P - (row - radius), col_P - (col - radius));
+                // if we are out of bounds on the actual image, then we can't include this pixel
+                // and we must mark it as invalid, and then continue on
+                if (outOfBufferBounds(m_height, m_width, row_P, col_P)) {
+                    P_valid[kernel_index] = false;
+                    continue;
+                }
+                int image_index = getIndex(m_width, row_P, col_P);
+                P[kernel_index] = in[image_index]; // get the pixel value from the input buffer
+                P_valid[kernel_index] = true; // valid
+            }
+        }
+        Eigen::Vector3f filtered_value(0.0, 0.0, 0.0);
+        float curr_normalizer = normalizer;
+        for (int K = 0; K < kernel_size; K++) {
+            if (!P_valid[K]) {
+                normalizer -= kernel[K];
+                continue;
+            }
+            filtered_value += P[K] * kernel[K];
+        }
+        filtered_value = filtered_value / curr_normalizer;
+        temp_buf[i] = filtered_value;
+    }
+    // copy into our output buffer
+    for (int i = 0; i < num_pixels; i++) {
+        out[i] = temp_buf[i];
+    }
+}
+
+// perform a sobel filter (edge detection) on a buffer. Improves results for the feature denoising
+// significantly around edges.
+void Denoiser::sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
+    // create temporary buffer
+    int num_pixels = m_height * m_width;
+    Eigen::Vector3f temp_buf[num_pixels];
+    // create Kx, Ky
+    float Kx[9] = {1.0, 0.0, -1.0, 2.0, 0.0, -2.0, 1.0, 0.0, -1.0};
+    float Ky[9] = {1.0, 2.0, 1.0, 0.0, 0.0, 0.0, -1.0, -2.0, -1.0};
+    Eigen::Vector3f P[9]; // our pixels that we are convolving with
+    // for each pixel, calculate Gx, Gy and the gradient G.
+    for (int i = 0; i < num_pixels; i++) {
+        int row, col;
+        getCoords(i, m_width, &row, &col);
+        Eigen::Vector3f Gx(0.0, 0.0, 0.0);
+        Eigen::Vector3f Gy(0.0, 0.0, 0.0);
+        for (int row_P = row - 1; row_P <= row + 1; row_P++) {
+            for (int col_P = col - 1; col_P <= col + 1; col_P++) {
+                // check if we are out of bounds. if we are, we need to get
+                // a mirrored pixel so our sobel filter does not create fake edges
+                int kernel_index = getIndex(3, row_P - (row - 1), col_P - (col - 1));
+                int image_index;
+                if (outOfBufferBounds(3, 3, row_P - (row - 1), col_P - (col - 1))) {
+                    int new_row, new_col;
+                    // if the row is out of bounds, we need to reflect it across the kernel fulcrum
+                    if (row_P >= m_height || row_P < 0) {
+                        int row_dist = row_P - row;
+                        new_row = row - row_dist;
+                    } else new_row = row_P;
+                    // if the col is out of bounds, then we need to reflect it too
+                    if (col_P >= m_width || col_P < 0) {
+                        int col_dist = col_P - col;
+                        new_col = col - col_dist;
+                    } else new_col = col_P;
+                    image_index = getIndex(m_width, new_row, new_col);
+
+                } else image_index = getIndex(m_width, row_P, col_P);
+                Gx += Kx[kernel_index] * in_buf[image_index];
+                Gy += Ky[kernel_index] * in_buf[image_index];
+            }
+        }
+        // square Gx and Gy
+        Gx = Gx.cwiseQuotient(Gx);
+        Gy = Gy.cwiseQuotient(Gy);
+        // calculate G, this is what we want.
+        Eigen::Vector3f G2 = (Gx + Gy);
+        Eigen::Vector3f G(std::sqrt(G2(0)), std::sqrt(G2(1)), std::sqrt(G2(2)));
+        temp_buf[i] = G;
+    }
+    // copy into our output buffer
+    for (int i = 0; i < num_pixels; i++) {
+        out_buf[i] = temp_buf[i];
+    }
+}
+
 
 int Denoiser::getIndex(int cols, int row, int col) {
     return cols * row + col;
@@ -643,31 +804,6 @@ void Denoiser::saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod) {
         std::cout << "Wrote rendered image to " << (m_name + "-" + nameMod + ".png").toStdString() << std::endl;
     } else {
         std::cerr << "Error: failed to write image to " << (m_name + "-" + nameMod + ".png").toStdString() << std::endl;
-    }
-}
-
-template <class T>
-void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init) {
-    int pixels = m_height * m_width;
-    T temp[pixels];
-    for (int i = 0; i < pixels; i++) {
-        int row, col;
-        getCoords(i, m_width, &row, &col);
-        float weight_total = 0.f;
-        T accumulator = init;
-        for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
-            for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
-                if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
-                int neighbourhood_index = getIndex((2 * c_r) + 1, row_N - (row - c_r), col_N - (col - c_r));
-                int image_index = getIndex(m_width, row_N, col_N);
-                weight_total += weights[i][neighbourhood_index];
-                accumulator += weights[i][neighbourhood_index] * in[image_index];
-            }
-        }
-        temp[i] = accumulator / weight_total;
-    }
-    for (int i = 0; i < pixels; i++) {
-        out[i] = temp[i];
     }
 }
 
