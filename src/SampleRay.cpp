@@ -26,8 +26,8 @@ SampledRayInfo SampleRay::sampleRay(const MaterialType type, const Vector3f &pos
     case REFRACTION:
         return refraction(position, incoming_ray, surface_normal, mat);
     case SINGLE_SCATTERING:
-//        return singleScattering(position, incoming_ray, surface_normal, mat, scene);
-        return scattering(position, incoming_ray, surface_normal, mat, scene);
+        return singleScattering(position, incoming_ray, surface_normal, mat, scene);
+//        return scattering(position, incoming_ray, surface_normal, mat, scene);
     case DIFFUSE_SCATTERING:
         return scattering(position, incoming_ray, surface_normal, mat, scene);
     default:
@@ -47,36 +47,36 @@ SampledRayInfo SampleRay::singleScattering(const Vector3f &position, const Ray &
 
     Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
     Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
-    Vector3f sig_t = sig_a + sig_s;
-    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
+    float sig_t = (sig_a + sig_s).norm();
+//    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
 
-    float r = -std::log(eps_1)/sig_tr;
+    float r = -std::log(eps_1)/sig_t;
     float theta = 2.f * M_PI * eps_2;
 
     const Vector3f tangentspace_pos = Vector3f(r * cos(theta), 0.0f, r * sin(theta));
     const Vector3f worldspace_pos = tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
-//    sampled_ray.ray.o = position + worldspace_pos;
 
     sampled_ray.ray.o = position + worldspace_pos;
-    sampled_ray.ray.d = -sampled_ray.ray.d;
+//    sampled_ray.ray.d = -sampled_ray.ray.d;
 
-    IntersectionInfo i;
-    float d = r;
-    Vector3f normal = surface_normal;
-    Ray back_normal(sampled_ray.ray.o, -surface_normal, AIR_IOR, true);
-    if(scene.getBVH().getIntersection(back_normal, &i, false)) {
-        const Mesh * m = static_cast<const Mesh *>(i.object);
-        const Triangle *t = static_cast<const Triangle *>(i.data);
-//        normal = t->getNormal(i);
-        sampled_ray.ray.o = i.hit;
-//        d = (sampled_ray.ray.o - position).norm();
-    }
+//    IntersectionInfo i;
+//    float d = r;
+//    Vector3f normal = surface_normal;
+//    Ray back_normal(sampled_ray.ray.o, -surface_normal, AIR_IOR, true);
+//    if(scene.getBVH().getIntersection(back_normal, &i, false)) {
+//        const Mesh * m = static_cast<const Mesh *>(i.object);
+//        const Triangle *t = static_cast<const Triangle *>(i.data);
+////        normal = t->getNormal(i);
+//        sampled_ray.ray.o = i.hit;
+////        d = (sampled_ray.ray.o - position).norm();
+//    }
 
-    sampled_ray.ray.d = -sampled_ray.ray.d;
-    float pdf = sig_tr * pow(M_E, -sig_tr * r);
+//    sampled_ray.ray.d = -sampled_ray.ray.d;
+    float pdf = std::abs(sig_t * pow(M_E, -sig_t * r));
 
 //    std::cout << "RAD: " << r << std::endl;
-    return SampledRayInfo(sampled_ray.ray, sampled_ray.prob * std::abs(pdf));
+//    std::cout << pdf << std::endl;
+    return SampledRayInfo(sampled_ray.ray, sampled_ray.prob * pdf/100.f);
 }
 
 
@@ -99,7 +99,7 @@ SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incomi
     float r = std::sqrt(std::log(1.f - eps_1 * (1.f - pow(M_E, -sig_tr * pow(R_m, 2))))/-sig_tr);
     float theta = 2.f * M_PI * eps_2;
 
-    const Vector3f tangentspace_pos = Vector3f(r * cos(theta), 0.0f, r * sin(theta));
+    const Vector3f tangentspace_pos = Vector3f(r * cos(theta), 0.f, r * sin(theta));
     const Vector3f worldspace_pos = tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
 //    sampled_ray.ray.o = position + worldspace_pos;
 
@@ -111,11 +111,12 @@ SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incomi
     Vector3f normal = surface_normal;
     Ray back_normal(sampled_ray.ray.o, -surface_normal, AIR_IOR, true);
     if(scene.getBVH().getIntersection(back_normal, &i, false)) {
-        const Mesh * m = static_cast<const Mesh *>(i.object);
+//        const Mesh * m = static_cast<const Mesh *>(i.object);
         const Triangle *t = static_cast<const Triangle *>(i.data);
         normal = t->getNormal(i);
         sampled_ray.ray.o = i.hit;
         d = (sampled_ray.ray.o - position).norm();
+//        std::cout <
     }
 
     sampled_ray.ray.d = -sampled_ray.ray.d;
@@ -123,7 +124,7 @@ SampledRayInfo SampleRay::scattering(const Vector3f &position, const Ray &incomi
 //    float d = (sampled_ray.ray.o - position).norm();
 //    std::cout << "r: " << r << " d: " << d << std::endl;
     float R_dr =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(r, 2)/(2.f * v));
-    float R_dr2 =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(d, 2)/(2.f * v));
+//    float R_dr2 =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(d, 2)/(2.f * v));
 //    float R_dr = 1.f/M_PI * sig_tr * pow(M_E, -sig_tr * pow(r, 2));
 //    float pdf = R_dr/(1.f - pow(M_E, -sig_tr * pow(R_m, 2)));
     float pdf = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)))/100.f;

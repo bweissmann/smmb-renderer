@@ -22,8 +22,8 @@
 
 typedef float REAL;
 
-#define IMAGE_WIDTH 200
-#define IMAGE_HEIGHT 200
+#define IMAGE_WIDTH 100
+#define IMAGE_HEIGHT 100
 
 #define MIN(a, b) (a) < (b) ? (a) : (b)
 #define MAX(a, b) (a) > (b) ? (a) : (b)

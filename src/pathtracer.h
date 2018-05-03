@@ -35,7 +35,7 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 10000;
+    const int M_NUM_SAMPLES = 1000;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
@@ -53,6 +53,8 @@ private:
     Eigen::Vector3f directLightContribution(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
+    Eigen::Vector3f directLightContributionSingleScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
+                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
 
     Eigen::Vector3f directLightContributionScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);

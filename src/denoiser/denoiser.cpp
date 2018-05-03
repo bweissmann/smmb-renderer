@@ -545,7 +545,7 @@ void Denoiser::calculateBufferVariance(int num_pixels, T** samples, int* num_sam
 template <class T>
 void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init) {
     int pixels = m_height * m_width;
-    T temp[pixels];
+    T *temp = new T[pixels];
     for (int i = 0; i < pixels; i++) {
         int row, col;
         getCoords(i, m_width, &row, &col);
@@ -570,7 +570,7 @@ void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init
 void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f* out) {
     // make a temporary array
     int num_pixels = m_height * m_width;
-    Eigen::Vector3f temp_buf[num_pixels];
+    Eigen::Vector3f *temp_buf = new Eigen::Vector3f[num_pixels];
     // generate Gaussian kernel
     int radius = std::ceil(std_dev * 3.f); // we don't care about being >3sigma away
     int kernel_size = ((2 * radius) + 1) * ((2 * radius) + 1);
@@ -588,7 +588,7 @@ void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f*
     }
     // iterate over all pixels and perform filter
     // for the (2f + 1) x (2f + 1) centre patch
-    Eigen::Vector3f P[kernel_size];
+    Eigen::Vector3f *P = new Eigen::Vector3f[kernel_size];
     bool P_valid[kernel_size];
     for (int i = 0; i < num_pixels; i++) {
         int row, col;
@@ -630,7 +630,7 @@ void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f*
 void Denoiser::sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
     // create temporary buffer
     int num_pixels = m_height * m_width;
-    Eigen::Vector3f temp_buf[num_pixels];
+    Eigen::Vector3f *temp_buf = new Eigen::Vector3f[num_pixels];
     // create Kx, Ky
     float Kx[9] = {1.0, 0.0, -1.0, 2.0, 0.0, -2.0, 1.0, 0.0, -1.0};
     float Ky[9] = {1.0, 2.0, 1.0, 0.0, 0.0, 0.0, -1.0, -2.0, -1.0};

@@ -22,10 +22,10 @@ Vector3f BSDF::getBsdfFromType(Ray incoming_ray, Vector3f &position, Ray outgoin
     case REFRACTION:
         return refractionBsdf(incoming_ray, outgoing_ray.d, normal, mat);
     case DIFFUSE_SCATTERING:
-        return 1.0 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
+        return bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
 //                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
     case SINGLE_SCATTERING:
-        return 1.0 * bssrdf1(incoming_ray, position, outgoing_ray, normal, mat);
+        return bssrdf1(incoming_ray, position, outgoing_ray, normal, mat);
 //                    + 0.5 * bssrdf(incoming_ray, position, outgoing_ray, normal, mat);
     default:
         std::cout << type << std::endl;
@@ -42,11 +42,12 @@ MaterialType BSDF::getType(const tinyobj::material_t& mat) {
     if (emission.norm() > 0.1) {
         return LIGHT;
     } else if (transmittance.norm() > 0.01) {
-        if (MathUtils::random() < 0.5) {
+//        return SINGLE_SCATTERING;
+        return DIFFUSE_SCATTERING;
+        if (MathUtils::random() < 0.9) {
             return DIFFUSE_SCATTERING;
         } else {
-//            return SINGLE_SCATTERING;
-            return DIFFUSE_SCATTERING;
+            return SINGLE_SCATTERING;
         }
     } else if (transmittance.norm() > 0.1) {
         return REFRACTION;
@@ -101,12 +102,13 @@ Vector3f BSDF::bssrdf1(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing
 
 //            std::cout << "s_i: " << s_i << ", s_i_prime: " << s_i_prime << std::endl;
             float ft_i = fresnel(AIR_IOR, 1.3, normal.dot(-incoming_ray.d));
+            float ft_o = fresnel(1.3, AIR_IOR, normal.dot(-outgoing_ray.d));
             float G = std::abs(normal.dot(wp_o)/normal.dot(wp_i));
             float sig_tc = sig_t + G * sig_t;
 
             float res = (mat.transmittance[i] * (1.f/(4.f*M_PI)))/sig_tc;
             res *= pow(M_E, -std::abs(s_i_prime) * sig_t);
-            res *= pow(M_E, -s_o * sig_t) * ft_i * 100.f;
+            res *= pow(M_E, -s_o * sig_t) * ft_i * ft_o;
 
 //            std::cout << -std::abs(s_i_prime) * sig_t << std::endl;
 //            std::cout << res << std::endl;
