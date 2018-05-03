@@ -204,9 +204,7 @@ SampledRayInfo SampleRay::uniformSampleHemisphere(const Vector3f &position, cons
 SampledRayInfo SampleRay::sampleIdealDiffuseImportance(const Vector3f &position, const Ray &incoming_ray,
                                                       const Vector3f &surface_normal) {
 
-    //TODO::DETERMINE WHICH OF THREE METHODS ARE RIGHT
-
-        float phi = acosf(sqrt(MathUtils::random()));
+    float phi = acosf(sqrt(MathUtils::random()));
     float theta = 2.f * M_PI * MathUtils::random();
 
     const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
@@ -215,21 +213,6 @@ SampledRayInfo SampleRay::sampleIdealDiffuseImportance(const Vector3f &position,
     Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
     float cos_phi = fabs(worldspace_direction.dot(surface_normal));
     return SampledRayInfo(ray, cos_phi / M_PI);
-
-
-    //other solution
-//    float r = sqrtf(MathUtils::random());
-//    float theta = 2.0f * M_PI * MathUtils::random();
-//    float x = r * cosf(theta);
-//    float y = r * sinf(theta);
-//    const Vector3f tangentspace_direction(x, y, fmaxf(0, 1.f - x * x - y * y));
-//    const Vector3f worldspace_direction = tangentToWorldSpace(surface_normal, tangentspace_direction);
-//    Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
-//    float cos_phi = worldspace_direction.dot(surface_normal);
-
-//    return SampledRayInfo(ray, cosf(theta) * sinf(theta) / M_PI);
-
-//    return SampledRayInfo(ray, cos_phi / M_PI);
 }
 
 SampledRayInfo SampleRay::sampleGlossySpecularImportance(const Vector3f &position, const Ray &incoming_ray,
@@ -242,15 +225,12 @@ SampledRayInfo SampleRay::sampleGlossySpecularImportance(const Vector3f &positio
     const Vector3f tangentspace_direction = Vector3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
     Vector3f worldspace_direction = tangentToWorldSpace(reflected_direction, tangentspace_direction);
     if (worldspace_direction.dot(surface_normal) < 0.f) {
-//        worldspace_direction = MathUtils::reflect(-1.f * worldspace_direction, reflected_direction);
-//        worldspace_direction = MathUtils::reflect(-1.f * worldspace_direction, surface_normal);
         worldspace_direction *= -1.f;
     }
 
     Ray ray(position, worldspace_direction, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
     float cos_phi = reflected_direction.dot(worldspace_direction);
 
-    //determine probability and check refract
     return SampledRayInfo(ray, (n + 1.f) * pow(cos_phi, n) / (2.f * M_PI));
 }
 

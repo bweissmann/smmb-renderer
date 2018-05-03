@@ -35,7 +35,7 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 1000;
+    const int M_NUM_SAMPLES = 20;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
@@ -43,8 +43,9 @@ private:
 
     /* Indicates if image should be denoised or tone-mapped */
     bool should_denoise = false;
+    bool use_direct_lighting = false;
 
-    const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
+    const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
 
     void toneMap(QRgb *imageData, PixelInfo *pixelInfo);
 

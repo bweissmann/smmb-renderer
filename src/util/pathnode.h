@@ -20,8 +20,8 @@ struct PathNode {
           directional_prob(directional_prob), point_prob(point_prob), radius((hit - ray.o).norm()) {}
 
 
-//    Eigen::Vector3f position;
     Eigen::Vector3f surface_normal;
+    Eigen::Vector3f left_from_normal;
     Eigen::Vector3f brdf; //can probably delete
     Eigen::Vector3f emission; //can probably delete
     Ray outgoing_ray;

@@ -133,9 +133,11 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         // Ignore all Emitted Light
         const Vector3f emitted_light = Vector3f(e[0], e[1], e[2]);
         if (emitted_light.norm() > 0 ) {
-            if (normal.dot(ray.d) < 0 && depth == 0) {
-
-                return emitted_light;
+            if (normal.dot(ray.d) < 0) {
+                if (!use_direct_lighting || depth == 0) {
+                    return emitted_light;
+                }
+                return Vector3f(0, 0, 0);
             } else {
                 return Vector3f(0.f, 0.f, 0.f);
             }
@@ -166,7 +168,7 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
         }
 
         // Direct Light Contribution
-        int num_direct_light = 1;
+        int num_direct_light = use_direct_lighting ? 1 : 0;
         for (int j = 0; j < num_direct_light; j++) {
             SampledLightInfo light_info = scene.sampleLight();
             if (lightIsVisible(light_info.position, i.hit, scene)) {
@@ -443,7 +445,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
     int pixel_y = output_y + m_section_id * m_output_height;
     int output_index = output_x + output_y * m_width;
 
-    Vector3f eye_center(0, 0, 0);
+    Vector3f eye_center(0, 0, 1);
     Vector3f eye_normal_world = (invViewMatrix * Vector4f(0, 0, -1, 0)).head<3>();
     PixelInfo total_info = PixelInfo(M_NUM_SAMPLES);
     for (int i = 0; i < M_NUM_SAMPLES; i++) {
@@ -540,7 +542,21 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
                     contrib = emitted_light;
                 } else {
                     float throughput = BDPT::getDifferentialThroughput(i.hit, N, lastNode.left_from, lastNode.surface_normal);
-                    contrib = prev_brdf.cwiseProduct(lastNode.contrib.cwiseProduct(emitted_light)) * throughput;
+
+                    //TEMP
+                    Vector3f dir = (i.hit - lastNode.hit_position);
+                    float distSquared = dir.squaredNorm();
+//                    distSquared = 1.f;
+//                    std::cout << "dist squared : " << distSquared << std::endl;
+
+                    dir = dir.normalized();
+//                    throughput = std::fabsf(normal.dot(dir) * lastNode.surface_normal.dot(dir)) / distSquared;
+                    //END TEMP
+
+//                    contrib = prev_brdf.cwiseProduct(lastNode.contrib.cwiseProduct(emitted_light)) * throughput / lastNode.directional_prob;
+//                    contrib = lastNode.contrib.cwiseProduct(prev_brdf.cwiseProduct(emitted_light)) *
+//                            std::fabsf(lastNode.surface_normal.dot(dir) * normal.dot(dir)) / (distSquared * lastNode.directional_prob);
+                    contrib = contrib.cwiseProduct(emitted_light) * fabsf(dir.dot(normal)); // * normal.dot(dir) / distSqured
                 }
                 PathNode node(ray, contrib, i.hit, i.hit, N, LIGHT, mat, 1.f / (2.f * M_PI), 1.f);
                 nodes.push_back(node);
