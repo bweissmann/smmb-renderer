@@ -91,8 +91,8 @@ def circle(i, target, prev, num_frames, center_x, center_z, radius, total_i, tot
 	output = []
 	for j in range(len(target)):
 		output.append(prev[j] + (i/f_num_frames)*(target[j] - prev[j]))
-	output[0] = center_x + math.sin(total_i/total_frames * math.pi * 2) * radius #x
-	output[2] = center_z + math.cos(total_i/total_frames * math.pi * 2) * radius #z
+	output[0] = center_x + math.sin(float(total_i)/total_frames * math.pi * 2) * radius #x
+	output[2] = center_z + math.cos(float(total_i)/total_frames * math.pi * 2) * radius #z
 	return tuple(output)
 
 main()
