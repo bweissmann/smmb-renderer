@@ -16,8 +16,8 @@
 newmtl leftSphere
     Ka 0.00 0.00 0.00
     Kd 0.01 0.51 0.01
-    #Ks 0 0 0
-    Ks 0.95 0.95 0.95
+    Ks 0 0 0
+    #Ks 0.95 0.95 0.95
     Tf 0.0 0.0 0.0
     Ni 1.5
     Ns 50
@@ -26,8 +26,8 @@ newmtl leftSphere
 newmtl rightSphere
     Ka 0.00 0.00 0.00
     Kd 0.41 0.01 0.41
-    Ks 0 0 0
-    #Ks 0.90 0.90 0.90
+    #Ks 0 0 0
+    Ks 0.90 0.90 0.90
     Tf 0.0 0.0 0.0
     # Ns 5
     Ns 1000
