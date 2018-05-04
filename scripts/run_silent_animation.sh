@@ -13,7 +13,7 @@ for file in example-scenes/anim/*.xml; do
     else 
         echo "no match found"; fi
 
-    time ./build-release/path-stencil $file output_images/anim/$num.png > /dev/null 
+    time ./build-release/path-stencil $file output_images/anim/$num > /dev/null 
     echo $file
     i=$[$i+1]
 done

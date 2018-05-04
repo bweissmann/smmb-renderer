@@ -55,17 +55,12 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
     Eigen::Vector3f directLightContributionSingleScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
-                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
+                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
     Eigen::Vector3f directLightContributionScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
 
-    Eigen::Vector3f directLightContributionScattering2(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
-                                                 Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
-
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &nodes, const Eigen::Vector3f &prev_brdf, bool &noScattering);
-
-
  };
 
 #endif // PATHTRACER_H

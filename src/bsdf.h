@@ -42,15 +42,11 @@ private:
 
     static Eigen::Vector3f reflectance(float r, const tinyobj::material_t &mat);
 
-    static Eigen::Vector3f bssrdf(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
+    static Eigen::Vector3f diffuseScatteringBssrdf(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
                                       Eigen::Vector3f normal, const tinyobj::material_t& mat);
 
-    static Eigen::Vector3f bssrdf2(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
-                                      Eigen::Vector3f normal, const tinyobj::material_t& mat);
-
-    static Eigen::Vector3f bssrdf1(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
+    static Eigen::Vector3f singleScatteringBssrdf(Ray incoming_ray, Eigen::Vector3f &position, Ray outgoing_ray,
                                   Eigen::Vector3f normal, const tinyobj::material_t& mat);
-
 
     static Eigen::Vector3f glossySpecularBsdf(Ray incoming_ray, Eigen::Vector3f out,
                                               Eigen::Vector3f normal, const tinyobj::material_t& mat);
@@ -62,8 +58,6 @@ private:
                                              Eigen::Vector3f normal, const tinyobj::material_t& mat);
 
     static Eigen::Vector3f idealDiffuseBsdf(const tinyobj::material_t& mat);
-
-    static float scatteringProb(float radius, const tinyobj::material_t& mat);
 
     static float cosineWeightedProb(const Eigen::Vector3f &outgoing, Eigen::Vector3f normal);
 

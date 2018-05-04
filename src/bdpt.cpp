@@ -23,6 +23,20 @@ BDPT::BDPT() {
 void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info, bool use_multiple_importance) {
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
+
+    //fix for subsurface scattering
+    use_multiple_importance = true;
+    for (int i = 0; i < num_light_nodes; i++) {
+        if (light_path[i].type == DIFFUSE_SCATTERING || light_path[i].type == SINGLE_SCATTERING) {
+            use_multiple_importance = false;
+        }
+    }
+    for (int i = 0; i < num_eye_nodes; i++) {
+        if (eye_path[i].type == DIFFUSE_SCATTERING || eye_path[i].type == SINGLE_SCATTERING) {
+            use_multiple_importance = false;
+        }
+    }
+
     for (int i = 1; i < num_eye_nodes; i++) {
         if (eye_path[i].type == LIGHT) {
             float weight = !use_multiple_importance ? 1.f / i : computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);

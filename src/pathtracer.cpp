@@ -174,7 +174,7 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
                 if (type == DIFFUSE_SCATTERING) {
                     total_light += directLightContributionScattering(light_info, normal, type, i.hit, ray, mat, scene) / num_direct_light;
                 } else if (type == SINGLE_SCATTERING) {
-                    total_light += directLightContributionSingleScattering(light_info, normal, type, i.hit, ray, mat, scene) / num_direct_light;
+                    total_light += directLightContributionSingleScattering(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
                 } else {
                     total_light += directLightContribution(light_info, normal, type, i.hit, ray, mat) / num_direct_light;
                 }
@@ -208,12 +208,9 @@ Vector3f PathTracer::traceRay(const Ray& ray, const Scene& scene, int depth)
     return total_light;
 }
 
-
 float PathTracer::getContinueProbability(Vector3f brdf) {
-//    return fmin(fmax(brdf.sum() / 3.f, 0.1f), 0.99f); // Continue Probability based on brdf
     return 0.5f; // Fixed Continue Probability
 }
-
 
 void PathTracer::toneMap(QRgb *imageData, PixelInfo *pixelInfo) {
     for(int y = 0; y < m_output_height; ++y) {
@@ -226,7 +223,6 @@ void PathTracer::toneMap(QRgb *imageData, PixelInfo *pixelInfo) {
         }
     }
 }
-
 
 bool PathTracer::lightIsVisible(Vector3f light_position, Vector3f surface_position, const Scene& scene) {
     float epsilon = 0.001; // Epsilon for distance to the light
@@ -242,7 +238,6 @@ bool PathTracer::lightIsVisible(Vector3f light_position, Vector3f surface_positi
 
     return false;
 }
-
 
 Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
                                              Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat) {
@@ -265,77 +260,15 @@ Vector3f PathTracer::directLightContribution(SampledLightInfo light_info, Vector
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob);
 }
 
-
-Vector3f PathTracer::directLightContributionScattering2(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
-                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene) {
-    if (type == REFRACTION || type == IDEAL_SPECULAR) {
-        return Vector3f(0.f, 0.f, 0.f);
-    }
-    const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
-
-    float eps_1 = MathUtils::random();
-    float eps_2 = MathUtils::random();
-
-    Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
-    Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
-    Vector3f sig_t = sig_a + sig_s;
-
-    float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
-    float v = 1.f/(2.f * sig_tr);
-    float R_m = std::sqrt(v/12.46);
-
-    float rad = std::sqrt(std::log(1.f - eps_1 * (1.f - pow(M_E, -sig_tr * pow(R_m, 2))))/-sig_tr);
-    float theta = 2.f * M_PI * eps_2;
-//    float rad = std::sqrt(-std::log(MathUtils::random())/((sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f)); // HARD CODED IN !!!!! // sqrt ??
-//    float theta = 2.f * M_PI * MathUtils::random();
-    const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), 0.01f, rad * sin(theta));
-//    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(surface_normal, tangentspace_pos);
-    const Vector3f worldspace_pos = SampleRay::tangentToWorldSpaceNotNormalized(-incoming_ray.d, tangentspace_pos);
-
-    Vector3f new_surface_position = surface_position + worldspace_pos;
-    Ray r(new_surface_position, incoming_ray.d, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
-
-    r.d *= -1.f;
-
-    IntersectionInfo i;
-    if(scene.getBVH().getIntersection(r, &i, false)) {
-        r.o = i.hit;
-    } else {
-//        return Vector3f(10, 10, 10);
-    }
-    r.d = -r.d;
-
-    const float distance_squared = pow((new_surface_position - light_info.position).norm(), 2);
-    const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
-    const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
-
-    const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
-//    float av_sig_tr = sig_tr.norm();
-//    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
-//    float prob = 2.f * sig_tr * rad * pow(M_E, -sig_tr * pow(rad, 2));
-    float R_dr =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(rad, 2)/(2.f * v));
-//    float R_dr2 =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(d, 2)/(2.f * v));
-//    float R_dr = 1.f/M_PI * sig_tr * pow(M_E, -sig_tr * pow(r, 2));
-//    float pdf = R_dr/(1.f - pow(M_E, -sig_tr * pow(R_m, 2)));
-    float pdf = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)))/100.f;
-//    std::cout << pdf << std::endl;
-    return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * pdf);
-}
-
-
 Vector3f PathTracer::directLightContributionSingleScattering(SampledLightInfo light_info, Vector3f surface_normal, MaterialType type,
-                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene) {
-    if (type == REFRACTION || type == IDEAL_SPECULAR) {
-        return Vector3f(0.f, 0.f, 0.f);
-    }
-
+                                             Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat) {
     const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
 
     Vector3f sig_a = Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
     Vector3f sig_s = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]);
     float sig_t = (sig_a + sig_s).norm();
 
-    float rad = -std::log(MathUtils::random())/sig_t;
+    float rad = 5.f * -std::log(MathUtils::random())/sig_t;
     float theta = 2.f * M_PI * MathUtils::random();
 
     const Vector3f tangentspace_pos = Vector3f(rad * cos(theta), 0.01f, rad * sin(theta));
@@ -344,21 +277,12 @@ Vector3f PathTracer::directLightContributionSingleScattering(SampledLightInfo li
     Vector3f new_surface_position = surface_position + worldspace_pos;
     Ray r(new_surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
 
-//    r.d *= -1.f;
-
-//    IntersectionInfo i;
-//    if(scene.getBVH().getIntersection(r, &i, false)) {
-//        r.o = i.hit;
-//    }
-
-//    r.d = -r.d;
-
     const float distance_squared = pow((new_surface_position - light_info.position).norm(), 2);
     const float cos_theta = fmax(surface_normal.dot(direction_to_light), 0);
     const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
 
     const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
-    float pdf = std::abs(sig_t * pow(M_E, -sig_t * rad))/100.f;
+    float pdf = std::abs(sig_t * pow(M_E, -sig_t * rad));
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * pdf);
 }
 
@@ -367,12 +291,6 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
                                              Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene) {
     const Vector3f direction_to_light = (light_info.position - surface_position).normalized();
 
-//    Vector3f sig_t = Vector3f(mat.transmittance[0], mat.transmittance[1], mat.transmittance[2]) +
-//            Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]);
-//    Vector3f sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt();
-
-//    float rad = std::sqrt(-std::log(MathUtils::random())/(sig_tr.norm()));
-//    float theta = 2.f * M_PI * MathUtils::random();
     float eps_1 = MathUtils::random();
     float eps_2 = MathUtils::random();
 
@@ -382,7 +300,7 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
 
     float sig_tr = (3.f * mat.sig_a.cwiseProduct(sig_t)).cwiseSqrt().norm();
     float v = 1.f/(2.f * sig_tr);
-    float R_m = 5.f * std::sqrt(v/12.46);
+    float R_m = 10.f * std::sqrt(v/12.46);
 
     float rad = std::sqrt(std::log(1.f - eps_1 * (1.f - pow(M_E, -sig_tr * pow(R_m, 2))))/-sig_tr);
     float theta = 2.f * M_PI * eps_2;
@@ -393,9 +311,7 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
     Vector3f new_surface_position = surface_position + worldspace_pos;
     Ray r(new_surface_position, direction_to_light, incoming_ray.index_of_refraction, incoming_ray.is_in_air);
 
-//    std::cout << rad << std::endl;
     r.d *= -1.f;
-
     IntersectionInfo i;
     Vector3f normal = surface_normal;
     if (scene.getBVH().getIntersection(r, &i, false)) {
@@ -411,29 +327,17 @@ Vector3f PathTracer::directLightContributionScattering(SampledLightInfo light_in
 
             const Triangle *t = static_cast<const Triangle *>(i.data);
             normal = t->getNormal(i);
-        } else {
-//            return Vector3f(10, 10, 10);
         }
     }
-//    r.d = -r.d;
 
     const float distance_squared = pow((new_surface_position - light_info.position).norm(), 2);
     const float cos_theta = fmax(normal.dot(direction_to_light), 0);
     const float cos_theta_prime = fmax(light_info.normal.dot(-direction_to_light), 0);
 
-//    const float cos_theta = 1.f;
-//    const float cos_theta_prime = 1.f;
-
     const Vector3f direct_brdf = BSDF::getBsdfFromType(incoming_ray, surface_position, r, surface_normal, mat, type);
-//    float av_sig_tr = sig_tr;
-//    float av_sig_tr = (sig_tr[0] + sig_tr[1] + sig_tr[2])/3.f;
-//    float prob = 2.f * av_sig_tr * rad * pow(M_E, -av_sig_tr * pow(rad, 2));
-
     float R_dr =  1.f/(2.f * M_PI * v) * pow(M_E, -pow(rad, 2)/(2.f * v));
-//    std::cout << R_dr << std::endl;
-    float prob = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)))/10.f;
+    float prob = R_dr/(1.f - pow(M_E, -pow(R_m, 2)/(2.f * v)));
 
-//    std::cout << prob << std::endl;
     return light_info.emission.cwiseProduct(direct_brdf) * cos_theta * cos_theta_prime / (distance_squared * light_info.prob * prob);
 }
 
