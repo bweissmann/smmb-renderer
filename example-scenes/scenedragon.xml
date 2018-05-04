@@ -1,5 +1,11 @@
 <scenefile>
-	<cameradata>
+<!-- 	<cameradata>
+		<pos x="0" y="5" z="20"/>
+		<up x="0" y="5" z="0"/>
+		<focus x="0" y="5" z="0"/>
+		<heightangle v="90"/>
+	</cameradata> -->
+		<cameradata>
 		<pos x="2" y="9" z="2"/>
 		<up x="0" y="5" z="0"/>
 		<focus x="-5" y="6" z="-1"/>

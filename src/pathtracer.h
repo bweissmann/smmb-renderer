@@ -35,17 +35,17 @@ private:
     Denoiser m_denoiser;
 
     /* Adjust the number of samples for each pixel (N in equations) */
-    const int M_NUM_SAMPLES = 20;
+    const int M_NUM_SAMPLES = 100;
 
     /* Helpers for parallelism and logging */
     bool should_run_parallel = true;
     const int PARALLEL_RANGE = 20;
 
     /* Indicates if image should be denoised or tone-mapped */
-    bool should_denoise = false;
-    bool use_direct_lighting = false;
+    bool should_denoise = true;
+    bool use_direct_lighting = true;
 
-    const RenderType render_type = BIDIRECTIONAL; // PATH_TRACING is the other option
+    const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
 
     void toneMap(QRgb *imageData, PixelInfo *pixelInfo);
 
@@ -55,13 +55,10 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
     Eigen::Vector3f directLightContributionSingleScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
-                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
+                                            Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat);
 
     Eigen::Vector3f directLightContributionScattering(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
-
-    Eigen::Vector3f directLightContributionScattering2(SampledLightInfo light_info, Eigen::Vector3f surface_normal, MaterialType type,
-                                                 Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
 
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &nodes, const Eigen::Vector3f &prev_brdf);
 
