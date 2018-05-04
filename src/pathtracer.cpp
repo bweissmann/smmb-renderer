@@ -377,8 +377,9 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 
         std::vector<PathNode> eye_path = { eye };
         std::vector<PathNode> light_path = { light};
-        tracePath(world_camera_space_ray, scene, 0, eye_path, Vector3f(1, 1, 1));
-        tracePath(ray_info.ray, scene, 0, light_path, Vector3f(1, 1, 1));
+        bool noScattering = true;
+        tracePath(world_camera_space_ray, scene, 0, eye_path, Vector3f(1, 1, 1), noScattering);
+        tracePath(ray_info.ray, scene, 0, light_path, Vector3f(1, 1, 1), noScattering);
 
         //the eye path contains only the eye node
         if (eye_path.size() == 1) {
@@ -395,7 +396,7 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
         SampleInfo sampleInfo = SampleInfo();
 
         //fills in sample_radiance in sampleInfo
-        BDPT::combinePaths(scene, eye_path, light_path, sampleInfo);
+        BDPT::combinePaths(scene, eye_path, light_path, sampleInfo, noScattering);
 
         //get normal, depth, color for denoising information
         sampleInfo.sample_normal = eye_path[1].surface_normal;
@@ -419,13 +420,14 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 
 
 //THIS IS THE UPDATED TACE PATH FUNCTION THAT PRECOMPUTES RADIANCE AT EACH NODE
-void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &nodes, const Vector3f &prev_brdf) {
+void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &nodes, const Vector3f &prev_brdf, bool &noScattering) {
     IntersectionInfo i;
     if (scene.getBVH().getIntersection(ray, &i, false)) {
-
-        //compute the contribution that will arrive at this node
         int lastNodeIndex = nodes.size() - 1;
         PathNode lastNode = nodes[lastNodeIndex];
+
+
+        //compute the contribution that will arrive at this node
         float cosine_theta = fabsf(lastNode.surface_normal.dot(ray.d));
         Vector3f contrib = lastNode.contrib.cwiseProduct(prev_brdf) * cosine_theta / lastNode.directional_prob;
 
@@ -445,22 +447,8 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
                 if (lastNodeIndex == 0) {
                     contrib = emitted_light;
                 } else {
-                    float throughput = BDPT::getDifferentialThroughput(i.hit, N, lastNode.left_from, lastNode.surface_normal);
-
-                    //TEMP
-                    Vector3f dir = (i.hit - lastNode.hit_position);
-                    float distSquared = dir.squaredNorm();
-//                    distSquared = 1.f;
-//                    std::cout << "dist squared : " << distSquared << std::endl;
-
-                    dir = dir.normalized();
-//                    throughput = std::fabsf(normal.dot(dir) * lastNode.surface_normal.dot(dir)) / distSquared;
-                    //END TEMP
-
-//                    contrib = prev_brdf.cwiseProduct(lastNode.contrib.cwiseProduct(emitted_light)) * throughput / lastNode.directional_prob;
-//                    contrib = lastNode.contrib.cwiseProduct(prev_brdf.cwiseProduct(emitted_light)) *
-//                            std::fabsf(lastNode.surface_normal.dot(dir) * normal.dot(dir)) / (distSquared * lastNode.directional_prob);
-                    contrib = contrib.cwiseProduct(emitted_light) * fabsf(dir.dot(normal)); // * normal.dot(dir) / distSqured
+                    Vector3f dir = (i.hit - lastNode.left_from).normalized();
+                    contrib = contrib.cwiseProduct(emitted_light) * fabsf(normal.dot(dir));
                 }
                 PathNode node(ray, contrib, i.hit, i.hit, N, LIGHT, mat, 1.f / (2.f * M_PI), 1.f);
                 nodes.push_back(node);
@@ -470,6 +458,9 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
 
         //get type of material
         MaterialType type = BSDF::getType(mat);
+
+        //have we hit a surface with subsurface scattering
+        noScattering = noScattering && (type != DIFFUSE_SCATTERING && type != SINGLE_SCATTERING);
         SampledRayInfo next_ray_info = SampleRay::sampleRay(type, i.hit, ray, normal, mat, scene);
         const Ray next_ray = next_ray_info.ray;
         const Vector3f brdf = BSDF::getBsdfFromType(ray, i.hit, next_ray, normal, mat, type);
@@ -478,15 +469,12 @@ void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::v
         if (MathUtils::random() < pdf_rr) {
             Vector3f N = ray.is_in_air ? normal : -normal;
             float directional_prob = next_ray_info.prob * pdf_rr;
-
-            //TODO:: determine radius
             PathNode node(next_ray, contrib, i.hit, next_ray.o, N, type, mat, directional_prob, 0);
             nodes.push_back(node);
-            tracePath(next_ray, scene, depth + 1, nodes, brdf);
+            tracePath(next_ray, scene, depth + 1, nodes, brdf, noScattering);
         } else {
             Vector3f N = ray.is_in_air ? normal : -normal;
 
-            //TODO:: determine radius
             PathNode node(ray, contrib, i.hit, next_ray.o, N, type, mat, (1 - pdf_rr), 0);
             nodes.push_back(node);
         }

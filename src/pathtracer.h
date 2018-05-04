@@ -42,7 +42,7 @@ private:
     const int PARALLEL_RANGE = 20;
 
     /* Indicates if image should be denoised or tone-mapped */
-    bool should_denoise = true;
+    bool should_denoise = false;
     bool use_direct_lighting = true;
 
     const RenderType render_type = PATH_TRACING; // PATH_TRACING is the other option
@@ -61,8 +61,6 @@ private:
                                             Eigen::Vector3f surface_position, Ray incoming_ray, const tinyobj::material_t& mat, const Scene &scene);
 
     void tracePath(const Ray& ray, const Scene& scene, int depth, std::vector<PathNode> &nodes, const Eigen::Vector3f &prev_brdf);
-
-
  };
 
 #endif // PATHTRACER_H

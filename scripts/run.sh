@@ -5,4 +5,4 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 cd ..
-time ./build-release/path-stencil example-scenes/scene$1.xml output_images/scene$1.png
+time ./build-release/path-stencil example-scenes/$1.xml output_images/$1

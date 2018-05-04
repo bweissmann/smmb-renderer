@@ -9,16 +9,31 @@ BDPT::BDPT() {
 
 }
 
-void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info) { /*PixelInfo &info, const Matrix4f &invViewMatrix) {*/
+void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info, bool use_multiple_importance) {
+
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
+
+    //subsurface scattering does not work with multiple importance sampling
+//    use_multiple_importance = true;
+//    for (int i = 0; i < num_eye_nodes; i++) {
+//        if (eye_path[i].type == DIFFUSE_SCATTERING || eye_path[i].type == SINGLE_SCATTERING) {
+//            use_multiple_importance = false;
+//        }
+//    }
+//    for (int i = 0; i < num_light_nodes; i++) {
+//        if (light_path[i].type == DIFFUSE_SCATTERING || light_path[i].type == SINGLE_SCATTERING) {
+//            use_multiple_importance = false;
+//        }
+//    }
+
+
     for (int i = 1; i < num_eye_nodes; i++) {
         if (eye_path[i].type == LIGHT) {
-            float weight = computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
+            float weight = !use_multiple_importance ? 1.f / i : computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
             if (eye_path.size() == 2) {
                 weight = 1.f;
             }
-//            weight = 1.f;
             Vector3f weighted_contrib = eye_path[i].contrib * weight;
             info.sample_radiance += weighted_contrib;
             continue;
@@ -26,23 +41,26 @@ void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_pat
         for (int j = 0; j < num_light_nodes; j++) {
             if (BDPT::isVisible(scene, eye_path[i].left_from, light_path[j].left_from)) {
                 Vector3f contrib = BDPT::computeContribution(eye_path, light_path, i, j);
-                float weight = computePathWeight(eye_path, light_path, i, j);
+                float weight = !use_multiple_importance ? 1.f / (i + j) : computePathWeight(eye_path, light_path, i, j);
                 Vector3f weighted_contrib = contrib * weight;
                 info.sample_radiance += weighted_contrib;
+
             }
         }
     }
 }
 
 /**
- * Given the two positions, this function checks if
- * the two positions can be connected by an edge.
+ * Takes in two positions and determines if the shadow ray
+ * between them exists. If so, returns true. If not, the
+ * points are occuded by another object and false is
+ * returned.
  *
  * @brief BDPT::isVisible
- * @param scene
- * @param position1
- * @param position2
- * @return
+ * @param scene - the scene
+ * @param position1 - position 1
+ * @param position2 - position 2
+ * @return true if visible; false otherwise
  */
 bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector3f &position2) {
     float epsilon = 0.001; // Epsilon for distance to the light
@@ -63,14 +81,17 @@ bool BDPT::isVisible(const Scene &scene, const Vector3f &position1, const Vector
 }
 
 /**
- * Computes the contribution.
+ * Computes the radiance of the path created
+ * by connecting the node at the max_light_index
+ * from the light path with the node at the
+ * max_eye_index from the eye path.
  *
  * @brief BDPT::computeContribution
- * @param eye_path
- * @param light_path
- * @param max_eye_index
- * @param max_light_index
- * @return
+ * @param eye_path - nodes sampled from the eye
+ * @param light_path - nodes sampled from the light
+ * @param max_eye_index - index of the last eye node
+ * @param max_light_index - index of the last light node
+ * @return radiance
  */
 Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                    int max_eye_index, int max_light_index) {
@@ -86,14 +107,15 @@ Vector3f BDPT::computeContribution(const std::vector<PathNode> &eye_path, const 
 }
 
 /**
- * Computes the contribution for the case that is
- * equivalent to path tracing with direct lighting
- * at the end of the path.
+ * Computes the radiance of the path where the
+ * node at the max_eye_index is connected directly
+ * with a point on the light source.
  *
  * @brief BDPT::computePathTracingContrib
- * @param eye_path
- * @param light
- * @param max_eye_index
+ * @param eye_path - nodes sampled from the eye
+ * @param light - point on the light
+ * @param max_eye_index - index of the node on the eye path
+ *  connected with the light
  * @return
  */
 Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, const PathNode &light, int max_eye_index) {
@@ -110,21 +132,32 @@ Vector3f BDPT::computePathTracingContrib(const std::vector<PathNode> &eye_path, 
     return radiance;
 }
 
+/**
+ * Computes the contribution of directly connecting
+ * the eye to light without any bounces.
+ *
+ * @brief BDPT::computeZeroBounceContrib
+ * @param eye - eye node
+ * @param light - light node
+ * @return radiance
+ */
 Vector3f BDPT::computeZeroBounceContrib(const PathNode &eye, const PathNode &light) {
     Vector3f to_light = (light.left_from - eye.left_from).normalized();
     return light.surface_normal.dot(to_light) < 0 ? light.emission : Vector3f(0,0,0);
 }
 
 /**
- * Computes the radiance for the combined eye and light
- * paths.
+ * Computes the radiance of the path constructed by
+ * connecting the node sampled by the eye path at
+ * the max_eye_index wih the node sampled by the light
+ * path at max-light_index.
  *
  * @brief BDPT::computeBidirectionalContrib
- * @param eye_path
- * @param light_path
- * @param max_eye_index
- * @param max_light_index
- * @return
+ * @param eye_path - eye path
+ * @param light_path - light path
+ * @param max_eye_index - index of the node sampled by the eye to connect
+ * @param max_light_index - index of the node sampled by the light to connect
+ * @return radiance of the connected path
  */
 Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                            int max_eye_index, int max_light_index) {
@@ -162,6 +195,16 @@ Vector3f BDPT::computeBidirectionalContrib(const std::vector<PathNode> &eye_path
     return total_contrib;
 }
 
+/**
+ * Computes the contribution or importance
+ * of the path up to the node at the max_index.
+ *
+ * @brief BDPT::computePathContrib
+ * @param path - path to compute
+ * @param max_index - last node on the path
+ * @param divide_by_prob - flag if
+ * @return contribution at max_index
+ */
 Vector3f BDPT::computePathContrib(const std::vector<PathNode> &path, int max_index, bool divide_by_prob) {
     Vector3f contrib(1, 1, 1);
     for (int i = 0; i < max_index; i++) {
@@ -198,6 +241,21 @@ float BDPT::getDifferentialThroughput(const Vector3f &position1, const Vector3f 
     return output;
 }
 
+/**
+ * Computes the weight of the path connected
+ * by the node sampled from the eye at the max
+ * eye index and the node sampled from the light
+ * at the max light index by weighting against
+ * all of the ways the path could have been
+ * sampled using the power heuristic.
+ *
+ * @brief BDPT::computePathWeight
+ * @param eye_path - nodes sampled from the eye
+ * @param light_path - nodes sampled from the light
+ * @param max_eye_index - index of the last node sampled by the eye
+ * @param max_light_index - index of the last node sampled by the light
+ * @return
+ */
 float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                  int max_eye_index, int max_light_index) {
     float true_prob = computePathProbability(eye_path, light_path, max_eye_index, max_light_index);
@@ -258,12 +316,18 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
 }
 
 /**
+ * Computes the probability of sampling nodes
+ * starting from the eye up to the node at
+ * the max_eye_index and of sampling
+ * nodes starting from the light up to the node at
+ * the max_light_index.
+ *
  * @brief BDPT::computePathProbability
- * @param eye_path
- * @param light_path
- * @param max_eye_index
- * @param max_light_index
- * @return
+ * @param eye_path - nodes sampled from the eye
+ * @param light_path - nodes sampled from the light
+ * @param max_eye_index - index of the last node in the eye path
+ * @param max_light_index - index of the last node in the light path
+ * @return probability of sampling these two paths
  */
 float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path,
                                    int max_eye_index, int max_light_index) {
@@ -273,10 +337,13 @@ float BDPT::computePathProbability(const std::vector<PathNode> &eye_path, const 
 }
 
 /**
+ * Computes the probability of the subpath up
+ * to the max_index.
+ *
  * @brief BDPT::computeSubpathProbability
- * @param subpath
- * @param max_index
- * @return
+ * @param subpath - path to compute probabiliy of
+ * @param max_index - index of the last node in the path
+ * @return probability of the path
  */
 float BDPT::computeSubpathProbability(const std::vector<PathNode> &subpath, int max_index) {
     float prob = 1.f;

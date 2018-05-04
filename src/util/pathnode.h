@@ -21,7 +21,6 @@ struct PathNode {
 
 
     Eigen::Vector3f surface_normal;
-    Eigen::Vector3f left_from_normal;
     Eigen::Vector3f brdf; //can probably delete
     Eigen::Vector3f emission; //can probably delete
     Ray outgoing_ray;
