@@ -11,18 +11,11 @@ Denoiser::Denoiser(int width, int height, int radius, QString name) :
     m_radius(radius),
     m_name(name)
 {
-    // malloc PixelInfo array
-//    m_pixel_info = new PixelInfo[(m_scale_factor * m_width) * (m_scale_factor * m_height)];
-//    for (int i = 0; i < (m_scale_factor * m_width) * (m_scale_factor * m_height); i++) {
-//        m_pixel_info[i].normal = Eigen::Vector3f(0.0, 0.0, 0.0);
-//        m_pixel_info[i].depth = 0.0;
-//        m_pixel_info[i].type = NONE;
-//    }
+
 }
 
 Denoiser::~Denoiser() {
-//    delete[] m_threadList;
-//    delete[] m_pixel_info;
+
 }
 
 void Denoiser::init(Eigen::Vector3f *intensityValues, int *numSamples,
@@ -45,6 +38,9 @@ void Denoiser::init(PixelInfo* pixelInfos) {
     // more abstract code.
     int num_pixels = m_width * m_height;
     m_intensityValues = new Eigen::Vector3f[num_pixels];
+    m_candidate_1 = new Eigen::Vector3f[num_pixels];
+    m_candidate_2 = new Eigen::Vector3f[num_pixels];
+    m_candidate_3 = new Eigen::Vector3f[num_pixels];
     m_numSamples = new int[num_pixels];
     m_samples = new Eigen::Vector3f*[num_pixels];
     m_colours = new Eigen::Vector3f*[num_pixels];
@@ -61,63 +57,98 @@ void Denoiser::init(PixelInfo* pixelInfos) {
         for (int j = 0; j < num_samples; j++) {
             m_samples[i][j] = pixelInfos[i].samplesPerPixel[j].sample_radiance;
             m_colours[i][j] = pixelInfos[i].samplesPerPixel[j].sample_color;
+            if (m_colours[i][j] == Eigen::Vector3f(INFINITY, INFINITY, INFINITY)) {
+                m_colours[i][j] = Eigen::Vector3f(0.0, 0.0, 0.0);
+            }
             m_normals[i][j] = pixelInfos[i].samplesPerPixel[j].sample_normal;
+            if (m_normals[i][j] == Eigen::Vector3f(INFINITY, INFINITY, INFINITY)) {
+                m_normals[i][j] = Eigen::Vector3f(0.0, 1.0, 0.0);
+            }
+            absVal(&m_normals[i][j]);
             m_depths[i][j] = pixelInfos[i].samplesPerPixel[j].sample_depth;
+            if (m_depths[i][j] == INFINITY) {
+                m_depths[i][j] = 0.5;
+            }
         }
     }
 }
 
 void Denoiser::run() {
     // split into the dual buffers and do a variance calculation for each of them
+    int num_pixels = m_width * m_height;
     splitIntoBuffers();
     calculateVariances();
 
     // calculate the variances for the colour space stuff
-    filterBufferVariances_RMZ13(m_intensityValues, m_samples, m_variances, m_intensityValuesA, m_intensityValuesB, Eigen::Vector3f(0.0, 0.0, 0.0));
+    filterBufferVariances_RMZ13(m_intensityValues, m_samples, m_variances, m_intensityValuesA, m_intensityValuesB, Eigen::Vector3f(0.0, 0.0, 0.0), "intensity");
 
     // calculate our feature variances like we did for the first colour filter.
-//    filterBufferVariances_RMZ13(m_colourValues, m_colours, m_colour_variances, m_colourValuesA, m_colourValuesB, Eigen::Vector3f(0.0, 0.0, 0.0));
-//    filterBufferVariances_RMZ13(m_normalValues, m_normals, m_normal_variances, m_normalValuesA, m_normalValuesB, Eigen::Vector3f(0.0, 0.0, 0.0));
-//    filterBufferVariances_RMZ13(m_depthValues, m_depths, m_depth_variances, m_depthValuesA, m_depthValuesB, 0.f);
+    filterBufferVariances_RMZ13(m_colourValues, m_colours, m_colour_variances, m_colourValuesA, m_colourValuesB, Eigen::Vector3f(0.0, 0.0, 0.0), "colour");
+    filterBufferVariances_RMZ13(m_normalValues, m_normals, m_normal_variances, m_normalValuesA, m_normalValuesB, Eigen::Vector3f(0.0, 0.0, 0.0), "normal");
+    filterBufferVariances_RMZ13(m_depthValues, m_depths, m_depth_variances, m_depthValuesA, m_depthValuesB, 0.f, "depth");
 
     // TODO: Pre-filter the feature buffers in the way described by the paper
-//    prefilterFeatures();
+    prefilterFeatures();
 
+    // TODO: Calculate the gradient of the feature buffers
+    m_colour_gradient = new Eigen::Vector3f[num_pixels];
+    m_normal_gradient = new Eigen::Vector3f[num_pixels];
+    m_depth_gradient = new float[num_pixels];
+
+    sobelFilterSquared(m_colourValues, m_colour_gradient);
+    sobelFilterSquared(m_normalValues, m_normal_gradient);
+    Eigen::Vector3f *depth_Vec = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f *depth_Grad = new Eigen::Vector3f[num_pixels];
+    for (int i = 0; i < num_pixels; i++) {
+        depth_Vec[i] = Eigen::Vector3f(m_depthValues[i], m_depthValues[i], m_depthValues[i]);
+    }
+    sobelFilterSquared(depth_Vec, depth_Grad);
+    for (int i = 0; i < num_pixels; i++) {
+        m_depth_gradient[i] = depth_Grad[i](0);
+    }
+
+
+    // DEBUG: Save the noisy image and feature buffers!
+    saveImage(m_intensityValues, "undenoised");
+    saveImage(m_colourValues, "colours");
+    saveImage(m_normalValues, "normals");
+    saveImage(depth_Vec, "depths");
     // CANDIATE FILTER ONE
     // do the first candidate filter
     // c_f = 1, c_k = 0.45, c_kf = 0.6
-    // DEBUG: Save the noisy image!
-    saveImage(m_intensityValues, "undenoised");
-    // TODO: Load filtered image into a different buffer, so we can perform the error estimate on it
-    // TODO: Save weights
-    // TODO: perform the bilateral feature filtering and again save the weights
-    // TODO: Calculate an actual set of weights based upon the min of the two weight buffers
-    // TODO: Filter the image according to these weights.
-    // Right now, we just denoise with an NL-means filter. This is fine, but should be extended to
-    // include the feature filtering + the SURE estimation of the error.
-    NL_means_filter(m_radius, 1, 0.45, m_intensityValues, m_intensityValues, m_variances, nullptr, false);
+    float** bilateral_weights1 = new float*[num_pixels];
+    float** NL_weights1 = new float*[num_pixels];
+    float** final_weights1 = new float*[num_pixels];
+    NL_means_filter(m_radius, 1, 0.45, m_intensityValues, m_variances, NL_weights1);
+    bilateral_means_filter(m_radius, 0.6, bilateral_weights1, 1e-3);
+    minWeights(m_radius, NL_weights1, bilateral_weights1, final_weights1);
+    filterWithWeights(m_radius, m_intensityValues, m_candidate_1, final_weights1, Eigen::Vector3f(0.0, 0.0, 0.0));
+    saveImage(m_candidate_1, "candidate-1");
 
     // CANDIDATE FILTER TWO
     // do the second candidate filter, which is done in the same way as the first. Same TODOs
     // c_f = 3, c_k = 0.45, c_kf = 0.6
+    float** NL_weights2 = new float*[num_pixels];
+    float** final_weights2 = new float*[num_pixels];
+    NL_means_filter(m_radius, 3, 0.45, m_intensityValues, m_variances, NL_weights2);
+    minWeights(m_radius, NL_weights2, bilateral_weights1, final_weights2);
+    filterWithWeights(m_radius, m_intensityValues, m_candidate_2, final_weights2, Eigen::Vector3f(0.0, 0.0, 0.0));
+    saveImage(m_candidate_2, "candidate-2");
 
     // CANDIDATE FILTER THREE
     // do the third candidate filter
     // c_f = *, c_k = +inf, c_kf = 0.6 (in other words, we don't need to NL_means_filter here
+    float** bilateral_weights3 = new float*[num_pixels];
+    bilateral_means_filter(m_radius, 0.6, bilateral_weights3, 1e-4);
+    filterWithWeights(m_radius, m_intensityValues, m_candidate_3, bilateral_weights3, Eigen::Vector3f(0.0, 0.0, 0.0));
+    saveImage(m_candidate_3, "candidate-3");
 
-    // SURE error estimate
-
-    // SURE error filtering
-
-    // SURE error binary map creation
-
-    // Binary map filtering
-
-    // Final filtering to m_intensityValues
-
+    average_candidates();
 
     // post-processing
     saveImage(m_intensityValues, "denoised");
+    delete[] depth_Vec;
+    delete[] depth_Grad;
 }
 
 
@@ -167,24 +198,26 @@ void Denoiser::splitIntoBuffers() {
         m_intensityValuesA[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         m_intensityValuesB[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         splitBuffer(i, num_samplesA, num_samplesB, m_samples, m_samplesA, m_intensityValuesA,
-                    m_samplesB, m_intensityValuesB);
+                    m_samplesB, m_intensityValuesB, false);
         // split the colours and average them correctly
         m_colourValuesA[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         m_colourValuesB[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         splitBuffer(i, num_samplesA, num_samplesB, m_colours, m_coloursA, m_colourValuesA,
-                     m_coloursB, m_colourValuesB);
+                     m_coloursB, m_colourValuesB, false);
         // split the normals and average them correctly
         m_normalValuesA[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         m_normalValuesB[i] = Eigen::Vector3f(0.0, 0.0, 0.0);
         splitBuffer(i, num_samplesA, num_samplesB, m_normals, m_normalsA, m_normalValuesA,
-                    m_normalsB, m_normalValuesB);
+                    m_normalsB, m_normalValuesB, false);
         // split the depths and average them correctly
         m_depthValuesA[i] = 0.0;
         m_depthValuesB[i] = 0.0;
         splitBuffer(i, num_samplesA, num_samplesB, m_depths, m_depthsA, m_depthValuesA,
-                    m_depthsB, m_depthValuesB);
+                    m_depthsB, m_depthValuesB, false);
         m_colourValues[i] = 0.5 * (m_colourValuesA[i] + m_colourValuesB[i]);
+//        absVal(&m_colourValues[i]);
         m_normalValues[i] = 0.5 * (m_normalValuesA[i] + m_normalValuesB[i]);
+//        absVal(&m_mormalValues[i]);
         m_depthValues[i] = 0.5 * (m_depthValuesA[i] + m_depthValuesB[i]);
     }
 }
@@ -230,7 +263,7 @@ void Denoiser::calculateVariances() {
 // on a pixel-by-pixel basis. After that, we multiply this ratio on the initial unfiltered sample variance.
 // This is our variance that we will use in the NL-means filter.
 template <class T>
-void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, T* in_A, T* in_B, T init) {
+void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, T* in_A, T* in_B, T init, QString mod) {
     // calculate the sample variance and dual buffer empirical variance
     std::cout << "Calculating variances..." << std::endl;
     int num_pixels = m_height * m_width;
@@ -253,8 +286,8 @@ void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, 
         variance_out[i] = init;
         dual_buffer_variances[i] = init;
     }
-    saveImage(temp_variances, "sample-variance-unfiltered");
-    saveImage(temp_buffer_variances, "buffer-variance-unfiltered");
+    saveImage(temp_variances, mod + "-" + "sample-variance-unfiltered");
+    saveImage(temp_buffer_variances, mod + "-" + "buffer-variance-unfiltered");
     // filter with a 21x21 box filter
     int r = 10;
     for (int i = 0; i < num_pixels; i++) {
@@ -277,8 +310,8 @@ void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, 
         variance_out[i] = filter_value / (float)normalizer;
         dual_buffer_variances[i] = buffer_filter_value / (float)normalizer;
     }
-    saveImage(variance_out, "sample-variance-filtered");
-    saveImage(dual_buffer_variances, "buffer-variance-filtered");
+    saveImage(variance_out, mod + "-" + "sample-variance-filtered");
+    saveImage(dual_buffer_variances, mod + "-" + "buffer-variance-filtered");
     // compute ratio on a per-pixel basis and then apply it to the original unblurred sample variances
     for (int i = 0; i < num_pixels; i++) {
         T normalizedVal;
@@ -289,7 +322,7 @@ void Denoiser::filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, 
     for (int i = 0; i < num_pixels; i++) {
         variance_out[i] = temp_variances[i];
     }
-    saveImage(variance_out, "final-variance");
+    saveImage(variance_out, mod + "-" + "final-variance");
     // cleanup
     delete[] temp_variances;
     delete[] temp_buffer_variances;
@@ -313,11 +346,11 @@ void Denoiser::prefilterFeatures() {
         depth_var[i] = Eigen::Vector3f(m_depth_variances[i], m_depth_variances[i], m_depth_variances[i]);
     }
     // get the weights for everyone
-    NL_means_filter(c_r, c_f, c_k, m_colourValues, nullptr, m_colour_variances, colour_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, m_colourValues, m_colour_variances, colour_prefilter_weights);
     std::cout << "Colours done" << std::endl;
-    NL_means_filter(c_r, c_f, c_k, m_normalValues, nullptr, m_normal_variances, normal_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, m_normalValues, m_normal_variances, normal_prefilter_weights);
     std::cout << "Normals done" << std::endl;
-    NL_means_filter(c_r, c_f, c_k, depth_vec, nullptr, depth_var, depth_prefilter_weights, true);
+    NL_means_filter(c_r, c_f, c_k, depth_vec, depth_var, depth_prefilter_weights);
     std::cout << "Depths done" << std::endl;
     // filter the A and B dual buffers with these weights
     filterWithWeights(c_r, m_colourValuesA, m_colourValuesA, colour_prefilter_weights, Eigen::Vector3f(0.0, 0.0, 0.0));
@@ -358,8 +391,7 @@ void Denoiser::prefilterFeatures() {
 // when filtering the depth feature, we turn it into Vector3fs with the depth duplicated
 // in each entry. This makes our code a little easier to understand even if a little slower.
 void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
-                               Eigen::Vector3f* out, Eigen::Vector3f* variance,
-                               float** weight_buf, bool saveWeights) {
+                               Eigen::Vector3f* variance, float** weight_buf) {
     int image_pixels = m_width * m_height;
     int neighbour_pixels = ((2 * c_r) + 1) * ((2 * c_r) + 1);
     int patch_pixels = ((2 * c_f) + 1) * ((2 * c_f) + 1);
@@ -376,15 +408,13 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
     Eigen::Vector3f* Q              = new Eigen::Vector3f[patch_pixels];
     Eigen::Vector3f* Q_variances    = new Eigen::Vector3f[patch_pixels];
     bool* Q_valid                   = new bool[patch_pixels];
+
     // we also need a temporary buffer to store the results of the NL-means filtering, so
     // we don't clobber the original buffer.
-    Eigen::Vector3f* temp_results   = new Eigen::Vector3f[image_pixels];
     // now we can start to go through our image.
     for (int pixel = 0; pixel < image_pixels; pixel++) { // FOR EACH PIXEL IN IMAGE
         // if we are saving weights, we need to malloc space for our weights
-        if (saveWeights) {
-            weight_buf[pixel] = new float[neighbour_pixels];
-        }
+        weight_buf[pixel] = new float[neighbour_pixels];
         float C = 0.f; // running total of the neigbour weights
         int row, col;
         getCoords(pixel, m_width, &row, &col); // get the current coordinate
@@ -473,26 +503,10 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
                 C += w;
             }
         }
-        // we can now iterate through the neighbourhood again, this time simply doing the N by N_weights.
-        Eigen::Vector3f filtered_value(0.0, 0.0, 0.0);
         for (int n = 0; n < neighbour_pixels; n++) {
-            if (N_valid[n]) {
-                if (saveWeights) weight_buf[pixel][n] = N_weights[n];
-                filtered_value += N_weights[n] * N[n];
-            } else {
-                if (saveWeights) weight_buf[pixel][n] = 0.0/0.0;
-            }
-        }
-        temp_results[pixel] = filtered_value / C;
-    }
-    // now we can move the temporary results into the final output, if the output variable is not
-    // a nullptr
-    if (out) {
-        for (int i = 0; i < image_pixels; i++) {
-            out[i] = temp_results[i];
+            weight_buf[pixel][n] = N_weights[n];
         }
     }
-    delete[] temp_results;
     delete[] P;
     delete[] P_variances;
     delete[] P_valid;
@@ -504,13 +518,178 @@ void Denoiser::NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f* in,
     delete[] N_valid;
 }
 
+void Denoiser::bilateral_means_filter(int c_r, float c_k, float** weight_buf, float tau) {
+    // we need to make some buffers to store the final results and our intermediaries
+    int image_pixels = m_width * m_height;
+    int neighbour_pixels = ((2 * c_r) + 1) * ((2 * c_r) + 1);
+    Eigen::Vector3f N_colour[neighbour_pixels];
+    Eigen::Vector3f N_colour_variance[neighbour_pixels];
+    Eigen::Vector3f N_normal[neighbour_pixels];
+    Eigen::Vector3f N_normal_variance[neighbour_pixels];
+    float N_depth[neighbour_pixels];
+    float N_depth_variance[neighbour_pixels];
+    bool N_valid[neighbour_pixels];
+    for (int pixel = 0; pixel < image_pixels; pixel++) {
+        weight_buf[pixel] = new float[neighbour_pixels];
+        Eigen::Vector3f P_colour = m_colourValues[pixel];
+        Eigen::Vector3f P_colour_variance = m_colour_variances[pixel];
+        Eigen::Vector3f P_colour_gradient = m_colour_gradient[pixel];
+        Eigen::Vector3f P_normal = m_normalValues[pixel];
+        Eigen::Vector3f P_normal_variance = m_normal_variances[pixel];
+        Eigen::Vector3f P_normal_gradient = m_normal_gradient[pixel];
+        float P_depth = m_depthValues[pixel];
+        float P_depth_variance = m_depth_variances[pixel];
+        float P_depth_gradient = m_depth_gradient[pixel];
+        int row, col;
+        getCoords(pixel, m_width, &row, &col);
+        for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
+            for (int col_N = col + c_r; col_N <= col + c_r; col_N++) {
+                int neighbour_index = getIndex((2 * c_r) + 1, row_N - (row - c_r), col_N - (col - c_r));
+                if (outOfBufferBounds(m_width, m_height, row_N, col_N)) {
+                    N_valid[neighbour_index] = false;
+                    continue;
+                }
+                int image_index = getIndex(m_width, row_N, col_N);
+                N_colour[neighbour_index] = m_colourValues[image_index];
+                N_colour_variance[neighbour_index] = m_colour_variances[image_index];
+                N_normal[neighbour_index] = m_normalValues[image_index];
+                N_normal_variance[neighbour_index] = m_normal_variances[image_index];
+                N_depth[neighbour_index] = m_depthValues[image_index];
+                N_depth_variance[neighbour_index] = m_depth_variances[image_index];
+            }
+        }
+        // now we can calculate the weights
+        for (int n = 0; n < neighbour_pixels; n++) {
+                if (N_valid[n]) {
+                float colour_dist = bilateralCalc(P_colour, N_colour[n], P_colour_variance, N_colour_variance[n], P_colour_gradient, tau, c_k);
+                float normal_dist = bilateralCalc(P_normal, N_normal[n], P_normal_variance, N_normal_variance[n], P_normal_gradient, tau, c_k);
+                float depth_dist = bilateralCalc(P_depth, N_depth[n], P_depth_variance, N_depth_variance[n], P_depth_gradient, tau, c_k);
+//                float maxDist = fmax(colour_dist, fmax(normal_dist, depth_dist));
+                float maxDist = fmax(colour_dist, normal_dist);
+                weight_buf[pixel][n] = std::exp(-maxDist);
+            }
+        }
+    }
+}
+
+void Denoiser::SURE_calc(int pixels, Eigen::Vector3f sigma2, Eigen::Vector3f* candidate, float* SURE, float* SURE_deriv) {
+    for (int i = 0; i < pixels; i++) {
+        Eigen::Vector3f SURE_vec;
+        squaredDifference(candidate[i], m_intensityValues[i], &SURE_vec);
+        SURE_vec = SURE_vec - sigma2;
+        Eigen::Vector3f deriv;
+        deriv = candidate[i].cwiseQuotient(m_intensityValues[i]);
+        SURE_deriv[i] = deriv.norm();
+        SURE_vec = SURE_vec + 2.f*sigma2.cwiseProduct(deriv);
+        SURE[i] = (1.f/3.f) * (SURE_vec(0) + SURE_vec(1) + SURE_vec(2));
+    }
+}
+
+void Denoiser::average_candidates() {
+    // calculate the true variance of the actual image
+    int num_pixels = m_width * m_height;
+    Eigen::Vector3f mean_intensity(0.0, 0.0, 0.0);
+    for (int i = 0; i < num_pixels; i++) {
+        mean_intensity += m_intensityValues[i];
+    }
+    mean_intensity = mean_intensity / (float)num_pixels;
+    Eigen::Vector3f sigma2(0.0, 0.0, 0.0);
+    for (int i = 0; i < num_pixels; i++) {
+        Eigen::Vector3f squaredDiff;
+        squaredDifference(m_intensityValues[i], mean_intensity, &squaredDiff);
+        sigma2 += squaredDiff;
+    }
+    // do the two SURE error estimates
+    sigma2 = sigma2 / (float)num_pixels;
+    float* SURE1 = new float[num_pixels];
+    float* SURE2 = new float[num_pixels];
+    float* SURE3 = new float[num_pixels];
+    float* SURE1_deriv = new float[num_pixels];
+    float* SURE2_deriv = new float[num_pixels];
+    float* SURE3_deriv = new float[num_pixels];
+    SURE_calc(num_pixels, sigma2, m_candidate_1, SURE1, SURE1_deriv);
+    SURE_calc(num_pixels, sigma2, m_candidate_2, SURE2, SURE2_deriv);
+    SURE_calc(num_pixels, sigma2, m_candidate_3, SURE3, SURE3_deriv);
+    // smooth the SURE error estimates
+    Eigen::Vector3f* SURE1_vec = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f* SURE2_vec = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f* SURE3_vec = new Eigen::Vector3f[num_pixels];
+    for (int i = 0; i < num_pixels; i++) {
+        SURE1_vec[i] = Eigen::Vector3f(SURE1[i], SURE1[i], SURE1[i]);
+        SURE2_vec[i] = Eigen::Vector3f(SURE2[i], SURE2[i], SURE2[i]);
+        SURE3_vec[i] = Eigen::Vector3f(SURE3[i], SURE3[i], SURE3[i]);
+    }
+    float** SURE1_filter_w = new float*[num_pixels];
+    float** SURE2_filter_w = new float*[num_pixels];
+    float** SURE3_filter_w = new float*[num_pixels];
+    NL_means_filter(1, 1, 1.f, SURE1_vec, m_variances, SURE1_filter_w);
+    NL_means_filter(1, 1, 1.f, SURE2_vec, m_variances, SURE2_filter_w);
+    NL_means_filter(1, 1, 1.f, SURE3_vec, m_variances, SURE3_filter_w);
+    filterWithWeights(1, SURE1, SURE1, SURE1_filter_w, 0.f);
+    filterWithWeights(1, SURE2, SURE2, SURE2_filter_w, 0.f);
+    filterWithWeights(1, SURE3, SURE3, SURE3_filter_w, 0.f);
+    delete[] SURE1_vec;
+    delete[] SURE2_vec;
+    delete[] SURE3_vec;
+    delete[] SURE1_filter_w;
+    delete[] SURE2_filter_w;
+    delete[] SURE3_filter_w;
+    // create binary maps
+    Eigen::Vector3f* binaryMap1 = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f* binaryMap2 = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f* binaryMap3 = new Eigen::Vector3f[num_pixels];
+    for (int i = 0; i < num_pixels; i++) {
+        binaryMap1[i] = Eigen::Vector3f(0.f, 0.f, 0.f);
+        binaryMap2[i] = Eigen::Vector3f(0.f, 0.f, 0.f);
+        binaryMap3[i] = Eigen::Vector3f(0.f, 0.f, 0.f);
+    }
+    for (int i = 0; i < num_pixels; i++) {
+        float min = fmin(SURE1[i], fmin(SURE2[i], SURE3[i]));
+        if (min == SURE1[i]) {
+            if (SURE1_deriv[i] < SURE2_deriv[i]) binaryMap1[i] = Eigen::Vector3f(1.f, 1.f, 1.f);
+            else binaryMap2[i] = Eigen::Vector3f(1.f, 1.f, 1.f);
+        }
+//        else if (min == SURE2[i]) {
+//            binaryMap2[i] = Eigen::Vector3f(1.f, 1.f, 1.f);
+//        }
+//        else binaryMap3[i] = Eigen::Vector3f(1.f, 1.f, 1.f);
+        else binaryMap2[i] = Eigen::Vector3f(1.f, 1.f, 1.f);
+    }
+    delete[] SURE1;
+    delete[] SURE2;
+    delete[] SURE3;
+    delete[] SURE1_deriv;
+    delete[] SURE2_deriv;
+    delete[] SURE3_deriv;
+    // filter binary maps
+    float** binaryMap1_w = new float*[num_pixels];
+    float** binaryMap2_w = new float*[num_pixels];
+    float** binaryMap3_w = new float*[num_pixels];
+//    NL_means_filter(5, 1, 1.f, binaryMap1, m_variances, binaryMap1_w);
+//    NL_means_filter(5, 1, 1.f, binaryMap2, m_variances, binaryMap2_w);
+//    NL_means_filter(5, 1, 1.f, binaryMap3, m_variances, binaryMap3_w);
+//    filterWithWeights(1, binaryMap1, binaryMap1, binaryMap1_w, Eigen::Vector3f(0.0, 0.0, 0.0));
+//    filterWithWeights(1, binaryMap2, binaryMap2, binaryMap2_w, Eigen::Vector3f(0.0, 0.0, 0.0));
+//    filterWithWeights(1, binaryMap3, binaryMap3, binaryMap3_w, Eigen::Vector3f(0.0, 0.0, 0.0));
+    for (int i = 0; i < num_pixels; i++) {
+//        m_intensityValues[i] = binaryMap1[i](0) * m_candidate_1[i] + binaryMap2[i](0) * m_candidate_2[i] + binaryMap3[i](0) * m_candidate_3[i];
+        m_intensityValues[i] = binaryMap1[i](0) * m_candidate_1[i] + binaryMap2[i](0) * m_candidate_2[i];
+
+    }
+    delete[] binaryMap1;
+    delete[] binaryMap2;
+    delete[] binaryMap3;
+    delete[] binaryMap1_w;
+    delete[] binaryMap2_w;
+    delete[] binaryMap3_w;
+}
 
 // ============
 // HELPER FUNCTIONS
 // ============
 template <class T>
 void Denoiser::splitBuffer(int i, int num_A, int num_B,
-                           T** source, T** a_dest, T* a_avg, T** b_dest, T* b_avg) {
+                           T** source, T** a_dest, T* a_avg, T** b_dest, T* b_avg, bool abs) {
     a_dest[i] = new T[num_A];
     b_dest[i] = new T[num_B];
     for (int j = 0; j < num_A; j++) {
@@ -518,11 +697,13 @@ void Denoiser::splitBuffer(int i, int num_A, int num_B,
         a_dest[i][j] = source[i][j];
     }
     a_avg[i] = a_avg[i] / (float)num_A;
+    if (abs) absVal(&a_avg[i]);
     for (int j = 0; j < num_B; j++) {
         b_avg[i] += source[i][num_A + j];
         b_dest[i][j] = source[i][num_A + j];
     }
     b_avg[i] = b_avg[i] / (float)num_B;
+    if (abs) absVal(&b_avg[i]);
 }
 
 template <class T>
@@ -542,15 +723,17 @@ void Denoiser::calculateBufferVariance(int num_pixels, T** samples, int* num_sam
     }
 }
 
+
 template <class T>
 void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init) {
     int pixels = m_height * m_width;
-    T *temp = new T[pixels];
+    T* temp = new T[pixels];
     for (int i = 0; i < pixels; i++) {
         int row, col;
         getCoords(i, m_width, &row, &col);
         float weight_total = 0.f;
         T accumulator = init;
+        std::cout << row << ", " << col << std::endl;
         for (int col_N = col - c_r; col_N <= col + c_r; col_N++) {
             for (int row_N = row - c_r; row_N <= row + c_r; row_N++) {
                 if (outOfBufferBounds(m_height, m_width, row_N, col_N)) continue;
@@ -565,12 +748,13 @@ void Denoiser::filterWithWeights(int c_r, T* in, T* out, float** weights, T init
     for (int i = 0; i < pixels; i++) {
         out[i] = temp[i];
     }
+    delete[] temp;
 }
 
 void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f* out) {
     // make a temporary array
     int num_pixels = m_height * m_width;
-    Eigen::Vector3f *temp_buf = new Eigen::Vector3f[num_pixels];
+    Eigen::Vector3f temp_buf[num_pixels];
     // generate Gaussian kernel
     int radius = std::ceil(std_dev * 3.f); // we don't care about being >3sigma away
     int kernel_size = ((2 * radius) + 1) * ((2 * radius) + 1);
@@ -588,7 +772,7 @@ void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f*
     }
     // iterate over all pixels and perform filter
     // for the (2f + 1) x (2f + 1) centre patch
-    Eigen::Vector3f *P = new Eigen::Vector3f[kernel_size];
+    Eigen::Vector3f P[kernel_size];
     bool P_valid[kernel_size];
     for (int i = 0; i < num_pixels; i++) {
         int row, col;
@@ -627,7 +811,7 @@ void Denoiser::gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f*
 
 // perform a sobel filter (edge detection) on a buffer. Improves results for the feature denoising
 // significantly around edges.
-void Denoiser::sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
+void Denoiser::sobelFilterSquared(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
     // create temporary buffer
     int num_pixels = m_height * m_width;
     Eigen::Vector3f *temp_buf = new Eigen::Vector3f[num_pixels];
@@ -660,7 +844,6 @@ void Denoiser::sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
                         new_col = col - col_dist;
                     } else new_col = col_P;
                     image_index = getIndex(m_width, new_row, new_col);
-
                 } else image_index = getIndex(m_width, row_P, col_P);
                 Gx += Kx[kernel_index] * in_buf[image_index];
                 Gy += Ky[kernel_index] * in_buf[image_index];
@@ -669,17 +852,60 @@ void Denoiser::sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf) {
         // square Gx and Gy
         Gx = Gx.cwiseQuotient(Gx);
         Gy = Gy.cwiseQuotient(Gy);
-        // calculate G, this is what we want.
+        // calculate G squared, this is what we want.
         Eigen::Vector3f G2 = (Gx + Gy);
-        Eigen::Vector3f G(std::sqrt(G2(0)), std::sqrt(G2(1)), std::sqrt(G2(2)));
-        temp_buf[i] = G;
+//        Eigen::Vector3f G(std::sqrt(G2(0)), std::sqrt(G2(1)), std::sqrt(G2(2)));
+//        temp_buf[i] = G;
+        temp_buf[i] = G2;
     }
     // copy into our output buffer
     for (int i = 0; i < num_pixels; i++) {
         out_buf[i] = temp_buf[i];
     }
+    delete[] temp_buf;
 }
 
+float Denoiser::bilateralCalc(Eigen::Vector3f fp, Eigen::Vector3f fq, Eigen::Vector3f varp, Eigen::Vector3f varq, Eigen::Vector3f gradp, float tau, float c_k) {
+    Eigen::Vector3f dist;
+    squaredDifference(fp, fq, &dist);
+    Eigen::Vector3f varPQ;
+    varPQ(0) = fmin(varp(0), varq(0));
+    varPQ(1) = fmin(varp(1), varq(1));
+    varPQ(2) = fmin(varp(2), varq(2));
+    Eigen::Vector3f num = dist - (fp + varPQ);
+    Eigen::Vector3f maxVarGrad;
+    maxVarGrad(0) = fmax(varp(0), gradp(0));
+    maxVarGrad(1) = fmax(varp(1), gradp(1));
+    maxVarGrad(2) = fmax(varp(2), gradp(2));
+    Eigen::Vector3f maxVarGradTau;
+    maxVarGradTau(0) = fmax(maxVarGrad(0), tau);
+    maxVarGradTau(1) = fmax(maxVarGrad(1), tau);
+    maxVarGradTau(2) = fmax(maxVarGrad(2), tau);
+    Eigen::Vector3f den = (c_k * c_k) * maxVarGradTau;
+    Eigen::Vector3f result = num.cwiseQuotient(den);
+    return (1.f/3.f) * (result(0) + result(1) + result(2));
+}
+
+float Denoiser::bilateralCalc(float fp, float fq, float varp, float varq, float gradp, float tau, float c_k) {
+    float dist;
+    squaredDifference(fp, fq, &dist);
+    float varPQ = fmin(varp, varq);
+    float num = dist - (varp + varPQ);
+    float maxVarGradTau = fmax(tau, fmax(varp, gradp));
+    float den = (c_k * c_k) * maxVarGradTau;
+    return num / den;
+}
+
+void Denoiser::minWeights(int c_r, float** wc, float** wf, float** w) {
+    int num_pixels = m_width * m_height;
+    int neighbour_pixels = ((2 * c_r) + 1) * ((2 * c_r) + 1);
+    for (int i = 0; i < num_pixels; i++) {
+        w[i] = new float[neighbour_pixels];
+        for (int j = 0; j < neighbour_pixels; j++) {
+            w[i][j] = fmin(wc[i][j], wf[i][j]);
+        }
+    }
+}
 
 int Denoiser::getIndex(int cols, int row, int col) {
     return cols * row + col;
@@ -722,6 +948,16 @@ void Denoiser::ratioValues(float a, float b, float c, float *ratio) {
         *ratio = a / b;
         *ratio = (*ratio) * c;
     }
+}
+
+void Denoiser::absVal(float *a) {
+    *a = fabs(*a);
+}
+
+void Denoiser::absVal(Eigen::Vector3f *a) {
+    (*a)(0) = fabs((*a)(0));
+    (*a)(1) = fabs((*a)(1));
+    (*a)(2) = fabs((*a)(2));
 }
 
 // ============

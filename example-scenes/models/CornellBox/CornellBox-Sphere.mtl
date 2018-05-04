@@ -20,7 +20,7 @@ newmtl leftSphere
     #Ks 0.95 0.95 0.95
     Tf 0.0 0.0 0.0
     Ni 1.5
-    Ns 50
+    Ns 20
     illum 5
 
 newmtl rightSphere

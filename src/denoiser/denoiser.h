@@ -37,24 +37,33 @@ private:
     bool outOfBufferBounds(int X, int Y, int x, int y);
     void filterBufferVariances_RKZ12();
     template <class T>
-    void filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, T* in_A, T* in_B, T init);
+    void filterBufferVariances_RMZ13(T* in, T** samples, T* variance_out, T* in_A, T* in_B, T init, QString mod);
     void prefilterFeatures();
-    void NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f *in, Eigen::Vector3f *out, Eigen::Vector3f *variance, float **weight_buf, bool saveWeights);
+    void NL_means_filter(int c_r, int c_f, float c_k, Eigen::Vector3f *in, Eigen::Vector3f *variance, float **weight_buf);
+    void bilateral_means_filter(int c_r, float c_k, float** weight_buf, float tau);
+    void SURE_calc(int pixels, Eigen::Vector3f sigma2, Eigen::Vector3f* candidate, float* SURE, float* SURE_deriv);
+    void average_candidates();
 
     // Other stuff
     template <class T>
     void splitBuffer(int i, int num_A, int num_B,
-                     T** source, T** a_dest, T* a_avg, T** b_dest, T* b_avg);
+                     T** source, T** a_dest, T* a_avg, T** b_dest, T* b_avg, bool abs);
     template <class T>
     void calculateBufferVariance(int num_pixels, T** samples, int* num_samples, T* average, T* out, T init);
     void squaredDifference(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f *difference);
     void squaredDifference(float a, float b, float *difference);
     void ratioValues(Eigen::Vector3f a, Eigen::Vector3f b, Eigen::Vector3f c, Eigen::Vector3f *ratio);
     void ratioValues(float a, float b, float c, float *ratio);
+    void absVal(float *a);
+    void absVal(Eigen::Vector3f *a);
     template <class T>
     void filterWithWeights(int c_r, T *in, T *out, float** weights, T init);
     void gaussianBlur(float std_dev, Eigen::Vector3f* in, Eigen::Vector3f* out);
-    void sobelFilter(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf);
+    void sobelFilterSquared(Eigen::Vector3f* in_buf, Eigen::Vector3f* out_buf);
+    float bilateralCalc(Eigen::Vector3f fp, Eigen::Vector3f fq, Eigen::Vector3f varp, Eigen::Vector3f varq, Eigen::Vector3f gradp, float tau, float c_k);
+
+    float bilateralCalc(float fp, float fq, float varp, float varq, float gradp, float tau, float c_k);
+    void minWeights(int c_r, float** wc, float** wf, float** w);
     void saveImage(Eigen::Vector3f *buf, QString nameMod);
     void saveImage(float *buf, QString nameMod);
     void saveImageNoToneMap(Eigen::Vector3f* buf, QString nameMod);
@@ -111,12 +120,20 @@ private:
     Eigen::Vector3f *m_normal_variancesB;
     float *m_depth_variancesB;
 
+    // candidate filters
+    Eigen::Vector3f* m_candidate_1;
+    Eigen::Vector3f* m_candidate_2;
+    Eigen::Vector3f* m_candidate_3;
+
     // other buffers
     Eigen::Vector3f* m_dual_buffer_variances;
     Eigen::Vector3f* m_variances;
     Eigen::Vector3f* m_colour_variances;
     Eigen::Vector3f* m_normal_variances;
     float* m_depth_variances;
+    Eigen::Vector3f* m_colour_gradient;
+    Eigen::Vector3f* m_normal_gradient;
+    float* m_depth_gradient;
 };
 
 #endif // DENOISER_H

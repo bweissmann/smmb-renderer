@@ -9,25 +9,20 @@ BDPT::BDPT() {
 
 }
 
+/**
+ * Combines the eye and light paths amd computes the
+ * radiance of each constructed path.
+ *
+ * @brief BDPT::combinePaths
+ * @param scene
+ * @param eye_path - nodes sampled from the eye
+ * @param light_path - nodes sampled from the light
+ * @param info - stores the radiance and info needed for denoising
+ * @param use_multiple_importance
+ */
 void BDPT::combinePaths(const Scene &scene, const std::vector<PathNode> &eye_path, const std::vector<PathNode> &light_path, SampleInfo &info, bool use_multiple_importance) {
-
     int num_eye_nodes = eye_path.size();
     int num_light_nodes = light_path.size();
-
-    //subsurface scattering does not work with multiple importance sampling
-//    use_multiple_importance = true;
-//    for (int i = 0; i < num_eye_nodes; i++) {
-//        if (eye_path[i].type == DIFFUSE_SCATTERING || eye_path[i].type == SINGLE_SCATTERING) {
-//            use_multiple_importance = false;
-//        }
-//    }
-//    for (int i = 0; i < num_light_nodes; i++) {
-//        if (light_path[i].type == DIFFUSE_SCATTERING || light_path[i].type == SINGLE_SCATTERING) {
-//            use_multiple_importance = false;
-//        }
-//    }
-
-
     for (int i = 1; i < num_eye_nodes; i++) {
         if (eye_path[i].type == LIGHT) {
             float weight = !use_multiple_importance ? 1.f / i : computePathWeight(eye_path, { eye_path[i] }, i - 1, 0);
@@ -280,30 +275,15 @@ float BDPT::computePathWeight(const std::vector<PathNode> &eye_path, const std::
         Vector3f temp_hit = c_light_path[index].hit_position;
         c_light_path[index].hit_position = c_light_path[index].left_from;
         c_light_path[index].left_from = temp_hit;
-
-
-        //TODO:: switch the normals
-//        Vector3f temp_hit_normal = c_light_path[index].hit_normal;
-//        c_light_path[index].hit_normal = c_light_path[index].left_from_normal;
-//        c_light_path[index].left_from_normal = temp_hit_normal;
-
         index++;
     }
 
     //need to switch left from and hit because now it's in reverse
     for (int i = 0; i < n; i++) {
         c_eye_path.push_back(c_light_path[n - i - 1]);
-
-
         Vector3f temp_hit = c_eye_path[i].hit_position;
         c_eye_path[i].hit_position = c_eye_path[i].left_from;
         c_eye_path[i].left_from = temp_hit;
-
-
-        //TODO::swap normals
-//        Vector3f temp_hit_normal = c_eye_path[i].hit_normal;
-//        c_eye_path[i].hit_normal = c_eye_path[i].left_from_normal;
-//        c_eye_path[i].left_from_normal = temp_hit_normal;
     }
 
     float sum = 0.f;

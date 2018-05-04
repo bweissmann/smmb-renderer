@@ -22,7 +22,6 @@ PathTracer::PathTracer(int width, int image_height, int output_height, int secti
 
 void PathTracer::traceScene(const Scene& scene)
 {
-//    Vector3f intensityValues[m_width * m_output_height]; // Init intensity values
     PixelInfo *pixelInfo = new PixelInfo[m_width * m_output_height];
 
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
@@ -515,7 +514,21 @@ void PathTracer::tracePixelBD(int output_x, int output_y, const Scene& scene,
 }
 
 
-//THIS IS THE UPDATED TACE PATH FUNCTION THAT PRECOMPUTES RADIANCE AT EACH NODE
+/**
+ * Traces light rays and stores each hit surface as a PathNode
+ * on the vector of nodes passed in. This function is used in
+ * bidirectional path-tracing in order to keep track of all of
+ * the surfaces hit.
+ *
+ * @brief PathTracer::tracePath
+ * @param ray - current ray
+ * @param scene - scene tracing
+ * @param depth - recursive depth
+ * @param nodes - vector of nodes representing the path
+ * @param prev_brdf - brdf of the previous node
+ * @param noScattering - boolean indicating if a scattering surface
+ * has been found.
+ */
 void PathTracer::tracePath(const Ray &ray, const Scene &scene, int depth, std::vector<PathNode> &nodes, const Vector3f &prev_brdf, bool &noScattering) {
     IntersectionInfo i;
     if (scene.getBVH().getIntersection(ray, &i, false)) {
